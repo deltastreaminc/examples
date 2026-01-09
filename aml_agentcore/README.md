@@ -9,8 +9,7 @@ This integration demonstrates how to build a proactive GenAI agent that monitors
 **Key Components:**
 - **Data Generator**: Simulates real-time financial transactions, customer profiles, KYC results, and sanctions matches
 - **Apache Kafka**: Message bus for live event streams
-- **DeltaStream**: Real-time context engine processing and materializing streaming data
-- **MCP Server**: Bridge exposing DeltaStream's materialized views to the agent
+- **DeltaStream**: Real-time context engine processing, materializing streaming data, and MCP support
 - **Bedrock AgentCore**: Scalable agent deployment and management platform
 - **Go HTTP Server**: Sample web application to interact with the deployed agent
 
