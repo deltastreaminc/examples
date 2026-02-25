@@ -71,7 +71,6 @@ WITH (
   'timestamp'    = 'reviewed_at'
 );
 
---************************************************************
 
 CREATE CHANGELOG recent_txn_stats_cl AS
 SELECT

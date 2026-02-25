@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --chatkit-bg: #0f0f10;
+  --chatkit-surface: #1a1a1e;
+  --chatkit-border: #2a2a2e;
+  --chatkit-text: #e8e8ea;
+  --chatkit-text-muted: #888890;
+  --chatkit-accent: #6366f1;
+  --chatkit-accent-hover: #818cf8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--chatkit-bg);
+  color: var(--chatkit-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
