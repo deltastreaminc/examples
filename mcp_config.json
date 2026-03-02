@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "deltastream": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@deltastream/mcp-server"
+      ],
+      "env": {
+        "DELTASTREAM_API_URL": "https://api.deltastream.io/mcp/v1",
+        "DELTASTREAM_TOKEN": "<YOUR_DELTASTREAM_API_TOKEN>",
+        "DELTASTREAM_DATABASE": "<YOUR_DATABASE_NAME>",
+        "DELTASTREAM_SCHEMA": "<YOUR_SCHEMA_NAME>",
+
+        "DELTASTREAM_RELATIONS": "oci_audit_mv,oci_logging_mv"
+      }
+    }
+  }
+}
