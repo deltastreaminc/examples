@@ -1,0 +1,2 @@
+kafka-python>=2.0.2
+pydantic-ai-slim[anthropic,mcp]>=0.0.20

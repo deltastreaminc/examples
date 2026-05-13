@@ -1,0 +1,239 @@
+{
+  "schema_version": "1.0.0",
+  "dataset": {
+    "anchor_ts_utc": "2026-03-01T00:00:00Z",
+    "windows": {
+      "last_24h_start": "2026-02-28T00:00:00Z",
+      "last_7d_start": "2026-02-22T00:00:00Z",
+      "prev_7d_start": "2026-02-15T00:00:00Z",
+      "prev_7d_end": "2026-02-22T00:00:00Z"
+    }
+  },
+  "prompts": [
+    {
+      "prompt_id": 1,
+      "title": "Top customers by 24h refund gap",
+      "text": "Return JSON only as {\"decisions\":[...]}. Rank top 5 customers by refund_gap_usd in last_24h. Include rank, customer_id, refund_gap_usd.",
+      "kind": "ranked",
+      "top_k": 5,
+      "expected_rows": [
+        {
+          "rank": 1,
+          "customer_id": "cust_0154",
+          "refund_gap_usd": 267.21
+        },
+        {
+          "rank": 2,
+          "customer_id": "cust_0157",
+          "refund_gap_usd": 118.28
+        },
+        {
+          "rank": 3,
+          "customer_id": "cust_0120",
+          "refund_gap_usd": 87.87
+        },
+        {
+          "rank": 4,
+          "customer_id": "cust_0124",
+          "refund_gap_usd": 81.57
+        },
+        {
+          "rank": 5,
+          "customer_id": "cust_0027",
+          "refund_gap_usd": 74.48
+        }
+      ],
+      "exact_fields": [
+        "rank",
+        "customer_id"
+      ],
+      "numeric_fields": [
+        "refund_gap_usd"
+      ],
+      "abs_tol": 1.0,
+      "rel_tol": 0.01,
+      "raw_vs_combined_note": "Single-table slice; both surfaces pass.",
+      "raw_outcome": "passes",
+      "why_raw": "refund_gap_usd is already a per-row column on refunds_raw_mv, so the agent only needs a refund_ts window filter plus ORDER BY ... LIMIT 5. No joins or derived metrics.",
+      "why_combined": "Same operation against the pre-joined context view; faster and cheaper because the join and window are already materialized."
+    },
+    {
+      "prompt_id": 2,
+      "title": "Top segments by 7d refund gap delta",
+      "text": "Return JSON only as {\"decisions\":[...]}. Rank top 3 customer segments by refund_gap_delta_7d (last_7d minus prev_7d). Include rank, customer_segment, refund_gap_delta_7d.",
+      "kind": "ranked",
+      "top_k": 3,
+      "expected_rows": [
+        {
+          "rank": 1,
+          "customer_segment": "smb",
+          "refund_gap_delta_7d": 1485.77
+        },
+        {
+          "rank": 2,
+          "customer_segment": "mid_market",
+          "refund_gap_delta_7d": -342.98
+        },
+        {
+          "rank": 3,
+          "customer_segment": "enterprise",
+          "refund_gap_delta_7d": -1706.69
+        }
+      ],
+      "exact_fields": [
+        "rank",
+        "customer_segment"
+      ],
+      "numeric_fields": [
+        "refund_gap_delta_7d"
+      ],
+      "abs_tol": 1.0,
+      "rel_tol": 0.01,
+      "raw_vs_combined_note": "Window-delta + segment join; raw fails.",
+      "raw_outcome": "fails",
+      "why_raw": "Must join refunds<->returns<->orders to attach customer_segment, bucket each row into last_7d vs prev_7d, sum per segment, then subtract \u2014 multi-step arithmetic that raw agents routinely get wrong.",
+      "why_combined": "refund_gap_usd and customer_segment are pre-joined per record; the agent only sums and subtracts."
+    },
+    {
+      "prompt_id": 3,
+      "title": "Top regions by 7d avg refund lag",
+      "text": "Return JSON only as {\"decisions\":[...]}. Rank top 3 regions by avg_refund_lag_hours in last_7d. Include rank, region, avg_refund_lag_hours.",
+      "kind": "ranked",
+      "top_k": 3,
+      "expected_rows": [
+        {
+          "rank": 1,
+          "region": "emea",
+          "avg_refund_lag_hours": 56.79
+        },
+        {
+          "rank": 2,
+          "region": "apac",
+          "avg_refund_lag_hours": 54.93
+        },
+        {
+          "rank": 3,
+          "region": "na",
+          "avg_refund_lag_hours": 54.38
+        }
+      ],
+      "exact_fields": [
+        "rank",
+        "region"
+      ],
+      "numeric_fields": [
+        "avg_refund_lag_hours"
+      ],
+      "abs_tol": 0.25,
+      "rel_tol": 0.01,
+      "raw_vs_combined_note": "Per-region average requiring sum/count discipline under a join; raw fails.",
+      "raw_outcome": "fails",
+      "why_raw": "region lives on orders, forcing a join; computing avg = sum(refund_lag_hours) / count(returns) under a join routinely produces off-by-row denominators.",
+      "why_combined": "region and refund_lag_hours are joined per record; the agent computes one ratio per group."
+    },
+    {
+      "prompt_id": 4,
+      "title": "Systemic gap worsened flag",
+      "text": "Return JSON only as {\"decisions\":[...]}. Provide one object with fields has_systemic_refund_gap_worsened, refund_gap_usd_7d, refund_gap_usd_prev_7d, refund_gap_delta_7d. Use return_ts (NOT refund_ts or order_ts) to assign each record to last_7d vs prev_7d. Set has_systemic_refund_gap_worsened=true when refund_gap_usd_7d > refund_gap_usd_prev_7d.",
+      "kind": "scalar",
+      "top_k": 1,
+      "expected_rows": [
+        {
+          "has_systemic_refund_gap_worsened": false,
+          "refund_gap_usd_7d": 3788.86,
+          "refund_gap_usd_prev_7d": 4352.76,
+          "refund_gap_delta_7d": -563.9
+        }
+      ],
+      "exact_fields": [
+        "has_systemic_refund_gap_worsened"
+      ],
+      "numeric_fields": [
+        "refund_gap_usd_7d",
+        "refund_gap_usd_prev_7d",
+        "refund_gap_delta_7d"
+      ],
+      "abs_tol": 1.0,
+      "rel_tol": 0.01,
+      "raw_vs_combined_note": "Scalar derived boolean; raw fails, small models occasionally flip the boolean on combined.",
+      "raw_outcome": "fails",
+      "why_raw": "Requires summing across two windows joined from refunds<->returns<->orders, then producing a single boolean \u2014 two failure surfaces (wrong sums or inverted writeback).",
+      "why_combined": "Pre-joined sums; only the boolean-writeback failure mode remains, which Haiku hits roughly 1 in 4 runs."
+    },
+    {
+      "prompt_id": 5,
+      "title": "Top segments by 7d late-delivery return rate",
+      "text": "Return JSON only as {\"decisions\":[...]}. Rank top 3 customer segments by late_delivery_return_rate in last_7d. Include rank, customer_segment, late_delivery_return_rate. Express late_delivery_return_rate as a decimal fraction between 0 and 1 (e.g. 0.52, NOT 52 or 52%).",
+      "kind": "ranked",
+      "top_k": 3,
+      "expected_rows": [
+        {
+          "rank": 1,
+          "customer_segment": "mid_market",
+          "late_delivery_return_rate": 0.52
+        },
+        {
+          "rank": 2,
+          "customer_segment": "smb",
+          "late_delivery_return_rate": 0.48
+        },
+        {
+          "rank": 3,
+          "customer_segment": "enterprise",
+          "late_delivery_return_rate": 0.36
+        }
+      ],
+      "exact_fields": [
+        "rank",
+        "customer_segment"
+      ],
+      "numeric_fields": [
+        "late_delivery_return_rate"
+      ],
+      "abs_tol": 0.005,
+      "rel_tol": 0.01,
+      "raw_vs_combined_note": "Three-way join + ratio + 0-1 fraction formatting; raw fails.",
+      "raw_outcome": "fails",
+      "why_raw": "Must derive is_late_delivery from shipments vs SLA, attach customer_segment via orders, compute late/total ratio per segment, then emit as a decimal fraction \u2014 raw agents typically nail at most two of the three.",
+      "why_combined": "is_late_delivery and customer_segment are precomputed per record; only the fraction-formatting discipline remains."
+    },
+    {
+      "prompt_id": 6,
+      "title": "Top reasons by 7d return-count delta",
+      "text": "Return JSON only as {\"decisions\":[...]}. Rank top 3 return reasons by returns_count_delta_7d (last_7d - prev_7d). Include rank, return_reason, returns_count_delta_7d.",
+      "kind": "ranked",
+      "top_k": 3,
+      "expected_rows": [
+        {
+          "rank": 1,
+          "return_reason": "not_as_described",
+          "returns_count_delta_7d": 8.0
+        },
+        {
+          "rank": 2,
+          "return_reason": "late_delivery",
+          "returns_count_delta_7d": 3.0
+        },
+        {
+          "rank": 3,
+          "return_reason": "wrong_item",
+          "returns_count_delta_7d": 0.0
+        }
+      ],
+      "exact_fields": [
+        "rank",
+        "return_reason"
+      ],
+      "numeric_fields": [
+        "returns_count_delta_7d"
+      ],
+      "abs_tol": 0.0,
+      "rel_tol": 0.0,
+      "raw_vs_combined_note": "Discrete window-delta with zero numeric tolerance; raw fails on rank tiebreaks.",
+      "raw_outcome": "fails",
+      "why_raw": "Strict-integer count delta (abs_tol=0) per return_reason; raw agents commonly mis-sort negative deltas (e.g. placing -4 above 0).",
+      "why_combined": "Pre-joined counts; ranking error mostly disappears, though small models can still mis-order negatives."
+    }
+  ],
+  "scenario_count": 6
+}

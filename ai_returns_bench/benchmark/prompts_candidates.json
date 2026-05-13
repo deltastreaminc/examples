@@ -1,0 +1,44 @@
+[
+  {
+    "prompt_id": 1,
+    "title": "Top customers by 24h refund gap",
+    "text": "Return JSON only as {\"decisions\":[...]}. Rank top 5 customers by refund_gap_usd in last_24h. Include rank, customer_id, refund_gap_usd.",
+    "kind": "ranked",
+    "top_k": 5
+  },
+  {
+    "prompt_id": 2,
+    "title": "Top segments by 7d refund gap delta",
+    "text": "Return JSON only as {\"decisions\":[...]}. Rank top 3 customer segments by refund_gap_delta_7d (last_7d minus prev_7d). Include rank, customer_segment, refund_gap_delta_7d.",
+    "kind": "ranked",
+    "top_k": 3
+  },
+  {
+    "prompt_id": 3,
+    "title": "Top regions by 7d avg refund lag",
+    "text": "Return JSON only as {\"decisions\":[...]}. Rank top 3 regions by avg_refund_lag_hours in last_7d. Include rank, region, avg_refund_lag_hours.",
+    "kind": "ranked",
+    "top_k": 3
+  },
+  {
+    "prompt_id": 4,
+    "title": "Systemic gap worsened flag",
+    "text": "Return JSON only as {\"decisions\":[...]}. Provide one object with fields has_systemic_refund_gap_worsened, refund_gap_usd_7d, refund_gap_usd_prev_7d, refund_gap_delta_7d. Use return_ts (NOT refund_ts or order_ts) to assign each record to last_7d vs prev_7d. Set has_systemic_refund_gap_worsened=true when refund_gap_usd_7d > refund_gap_usd_prev_7d.",
+    "kind": "scalar",
+    "top_k": 1
+  },
+  {
+    "prompt_id": 5,
+    "title": "Top segments by 7d late-delivery return rate",
+    "text": "Return JSON only as {\"decisions\":[...]}. Rank top 3 customer segments by late_delivery_return_rate in last_7d. Include rank, customer_segment, late_delivery_return_rate. Express late_delivery_return_rate as a decimal fraction between 0 and 1 (e.g. 0.52, NOT 52 or 52%).",
+    "kind": "ranked",
+    "top_k": 3
+  },
+  {
+    "prompt_id": 6,
+    "title": "Top reasons by 7d return-count delta",
+    "text": "Return JSON only as {\"decisions\":[...]}. Rank top 3 return reasons by returns_count_delta_7d (last_7d - prev_7d). Include rank, return_reason, returns_count_delta_7d.",
+    "kind": "ranked",
+    "top_k": 3
+  }
+]

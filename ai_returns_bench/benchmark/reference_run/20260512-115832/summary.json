@@ -1,0 +1,82 @@
+{
+  "run_id": "20260512-115832",
+  "dataset": {
+    "anchor_ts_utc": "2026-03-01T00:00:00Z",
+    "windows": {
+      "last_24h_start": "2026-02-28T00:00:00Z",
+      "last_7d_start": "2026-02-22T00:00:00Z",
+      "prev_7d_start": "2026-02-15T00:00:00Z",
+      "prev_7d_end": "2026-02-22T00:00:00Z"
+    }
+  },
+  "selected_prompt_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "rollup": [
+    {
+      "stage": "main",
+      "run_id": "20260512-115832",
+      "agent": "combined",
+      "model": "claude-haiku-4-5-20251001",
+      "runs": 24,
+      "passes": 23,
+      "pass_rate": 0.9583333333333334,
+      "tokens_in": 307051,
+      "tokens_out": 14093,
+      "tool_calls": 37,
+      "total_cost_usd": 0.377516,
+      "cost_per_correct": 0.016414,
+      "latency_p50_ms": 4928.5
+    },
+    {
+      "stage": "main",
+      "run_id": "20260512-115832",
+      "agent": "combined",
+      "model": "claude-sonnet-4-5-20250929",
+      "runs": 24,
+      "passes": 24,
+      "pass_rate": 1.0,
+      "tokens_in": 172231,
+      "tokens_out": 11591,
+      "tool_calls": 24,
+      "total_cost_usd": 0.690558,
+      "cost_per_correct": 0.028773,
+      "latency_p50_ms": 8264.5
+    },
+    {
+      "stage": "main",
+      "run_id": "20260512-115832",
+      "agent": "raw",
+      "model": "claude-haiku-4-5-20251001",
+      "runs": 24,
+      "passes": 4,
+      "pass_rate": 0.16666666666666666,
+      "tokens_in": 1549631,
+      "tokens_out": 31837,
+      "tool_calls": 104,
+      "total_cost_usd": 1.708816,
+      "cost_per_correct": 0.427204,
+      "latency_p50_ms": 14213.0
+    },
+    {
+      "stage": "main",
+      "run_id": "20260512-115832",
+      "agent": "raw",
+      "model": "claude-sonnet-4-5-20250929",
+      "runs": 24,
+      "passes": 4,
+      "pass_rate": 0.16666666666666666,
+      "tokens_in": 409241,
+      "tokens_out": 20507,
+      "tool_calls": 63,
+      "total_cost_usd": 1.535328,
+      "cost_per_correct": 0.383832,
+      "latency_p50_ms": 18052.0
+    }
+  ]
+}

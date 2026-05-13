@@ -1,0 +1,6 @@
+{
+  "name": "combined",
+  "mcp_url": "https://api.local.deltastream.io/mcp/v2",
+  "mcp_server_name": "deltastream",
+  "mcp_token_env": "COMBINED_MCP_TOKEN"
+}

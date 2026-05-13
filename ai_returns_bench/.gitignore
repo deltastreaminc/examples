@@ -1,0 +1,20 @@
+# Virtualenvs
+.venv/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Benchmark run outputs
+benchmark/out/
+
+# Generated seed data
+data/*.jsonl
+
+# Secrets / tokens
+tokens.txt
+
+# Editor / OS noise
+*.bak
+.DS_Store

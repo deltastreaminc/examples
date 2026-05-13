@@ -1,0 +1,6 @@
+{
+  "name": "raw",
+  "mcp_url": "https://api.local.deltastream.io/mcp/v2",
+  "mcp_server_name": "deltastream",
+  "mcp_token_env": "RAW_MCP_TOKEN"
+}
