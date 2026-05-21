@@ -1,0 +1,1 @@
+"""Pageviews demo package."""
