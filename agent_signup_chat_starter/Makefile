@@ -7,9 +7,9 @@ VENV_DIR ?= .venv
 VENV_PYTHON := $(VENV_DIR)/bin/python
 
 API_TOKEN ?=
-SIGNUP_API_URL ?= https://demo.local.deltastream.io/api/signup
-ANTHROPIC_BASE_URL ?= https://demo.local.deltastream.io/anthropic/
-DELTASTREAM_MCP_URL ?= https://api-kd8j38.stage.deltastream-internal.name/mcp/v2
+SIGNUP_API_URL ?= https://demo.deltastream.io/api/signup
+ANTHROPIC_BASE_URL ?= https://demo.deltastream.io/anthropic
+DELTASTREAM_MCP_URL ?= https://api-kap822.deltastream.io/mcp/v2
 INSECURE_DEMO_TLS ?= true
 DOCKER_EXTRA_ARGS ?=
 DEMO_HOST_IP ?=
