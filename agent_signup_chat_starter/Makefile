@@ -17,7 +17,7 @@ API_HOST_IP ?=
 
 DOCKER_HOST_MAP_ARGS :=
 ifneq ($(strip $(DEMO_HOST_IP)),)
-DOCKER_HOST_MAP_ARGS += --add-host demo.local.deltastream.io:$(DEMO_HOST_IP)
+DOCKER_HOST_MAP_ARGS += --add-host demo.deltastream.io:$(DEMO_HOST_IP)
 endif
 ifneq ($(strip $(API_HOST_IP)),)
 DOCKER_HOST_MAP_ARGS += --add-host api.local.deltastream.io:$(API_HOST_IP)
