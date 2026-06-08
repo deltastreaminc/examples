@@ -11,11 +11,11 @@ def _env_bool(name: str, default: bool) -> bool:
         return default
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
-SIGNUP_API_URL = os.getenv("SIGNUP_API_URL", "https://demo.local.deltastream.io/api/signup")
-ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "https://demo.local.deltastream.io/anthropic/")
+SIGNUP_API_URL = os.getenv("SIGNUP_API_URL", "https://demo.deltastream.io/api/signup")
+ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "https://demo.deltastream.io/anthropic")
 DELTASTREAM_MCP_URL = os.getenv(
     "DELTASTREAM_MCP_URL",
-    "https://api-kd8j38.stage.deltastream-internal.name/mcp/v2",
+    "https://api-kap822.deltastream.io/mcp/v2",
 )
 
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
