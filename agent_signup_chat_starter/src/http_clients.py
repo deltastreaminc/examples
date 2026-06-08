@@ -10,8 +10,12 @@ from .constants import ALLOWED_MVIEW_FQNS, ANTHROPIC_BASE_URL, SIGNUP_API_URL
 def signup(email: str, insecure_tls: bool) -> str:
     """Send signup request and return a user-friendly response string."""
 
+    signup_url = SIGNUP_API_URL
     with httpx.Client(verify=not insecure_tls, timeout=20.0) as client:
-        response = client.post(SIGNUP_API_URL, json={"email": email.strip()})
+        try:
+            response = client.post(signup_url, json={"email": email.strip()})
+        except httpx.HTTPError as exc:
+            raise RuntimeError(f"Signup request failed for `{signup_url}`: {exc}") from exc
 
     if response.status_code != 200:
         detail = _extract_error(response)
@@ -27,6 +31,7 @@ def signup(email: str, insecure_tls: bool) -> str:
 def probe_anthropic(api_token: str, insecure_tls: bool) -> None:
     """Validate shared token against Anthropic proxy endpoint."""
 
+    anthropic_models_url = f"{ANTHROPIC_BASE_URL.rstrip('/')}/v1/models"
     with httpx.Client(
         headers={
             "Authorization": f"Bearer {api_token}",
@@ -35,7 +40,12 @@ def probe_anthropic(api_token: str, insecure_tls: bool) -> None:
         verify=not insecure_tls,
         timeout=20.0,
     ) as client:
-        response = client.get(f"{ANTHROPIC_BASE_URL.rstrip('/')}/v1/models")
+        try:
+            response = client.get(anthropic_models_url)
+        except httpx.HTTPError as exc:
+            raise RuntimeError(
+                f"Anthropic endpoint request failed for `{anthropic_models_url}`: {exc}"
+            ) from exc
 
     if response.status_code >= 400:
         detail = _extract_error(response)
@@ -50,7 +60,10 @@ def probe_mcp(api_token: str, mcp_url: str, insecure_tls: bool) -> None:
         verify=not insecure_tls,
         timeout=20.0,
     ) as client:
-        response = client.get(mcp_url)
+        try:
+            response = client.get(mcp_url)
+        except httpx.HTTPError as exc:
+            raise RuntimeError(f"MCP endpoint request failed for `{mcp_url}`: {exc}") from exc
 
     if response.status_code == 404:
         raise RuntimeError(f"MCP endpoint not found (404): {mcp_url}")

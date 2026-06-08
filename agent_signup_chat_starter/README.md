@@ -6,9 +6,66 @@ It demonstrates:
 - Email signup flow against the demo signup API
 - A single shared `api_token` used for both Anthropic and DeltaStream MCP
 - A Streamlit chat UI backed by a pydantic-ai agent
-- Safety guardrails that only allow queries against:
-  - `testdb.public.pgmv`
-  - `checkout.public.checkout_save_agent_context_mv`
+- Safety guardrails that only allow queries against `starter.public.pageviews_mview`
+
+## DeltaStream Setup (Required)
+
+Before using chat in this app, set up the required relations in DeltaStream.
+
+Prerequisites:
+- Your default store already has a `pageviews` topic.
+- Datagen for `pageviews` is already running.
+- No manual write/`INSERT INTO` step is required for this example.
+
+Run these statements in order (or run each file in order):
+
+```sql
+-- dsql/01_database.sql
+CREATE DATABASE starter;
+```
+
+```sql
+-- dsql/02_pageviews_stream.sql
+CREATE STREAM starter.public.pageviews (
+  viewtime BIGINT,
+  userid VARCHAR,
+  pageid VARCHAR
+)
+WITH (
+  'topic'='pageviews',
+  'value.format'='json',
+  'key.format'='json',
+  'key.type'='STRUCT<userid VARCHAR>'
+);
+```
+
+```sql
+-- dsql/03_pageviews_mview.sql
+CREATE MATERIALIZED VIEW starter.public.pageviews_mview
+WITH (
+  'retention.millis' = 3600000,
+  'timestamp' = 'viewtime'
+)
+AS
+SELECT
+  viewtime,
+  userid,
+  pageid
+FROM starter.public.pageviews;
+```
+
+```sql
+-- dsql/04_grants.sql
+GRANT USAGE ON DATABASE starter TO ROLE base_demo_role;
+GRANT USAGE ON SCHEMA public TO ROLE base_demo_role;
+GRANT SELECT ON RELATION starter.public.pageviews_mview TO ROLE base_demo_role;
+```
+
+Quick verification:
+
+```sql
+SELECT * FROM starter.public.pageviews_mview LIMIT 20;
+```
 
 ## Flow
 
@@ -86,6 +143,7 @@ You can find the IP from your host `/etc/hosts` entry and use that value.
 ## Project Layout
 
 - `app.py`: Streamlit UI for signup, token validation, and chat
+- `dsql/`: Required DeltaStream SQL setup statements for this example
 - `src/constants.py`: Endpoint and policy constants
 - `src/config.py`: Typed runtime configuration
 - `src/http_clients.py`: Signup + endpoint probe helpers
@@ -96,6 +154,6 @@ You can find the IP from your host `/etc/hosts` entry and use that value.
 The starter enforces query policy in multiple places:
 - Prompt instructions require read-only access and `LIMIT`
 - Runtime SQL validator rejects non-`SELECT` statements
-- Runtime SQL validator rejects relations outside the two allowed materialized views
+- Runtime SQL validator rejects relations outside the allowed materialized view
 
 If you build on this template, keep these checks unless you explicitly intend broader access.
