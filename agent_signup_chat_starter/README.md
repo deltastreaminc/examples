@@ -83,9 +83,9 @@ Notes:
 ## Endpoints Configured In Code
 
 These live in `src/constants.py` so they are easy to update:
-- Signup API: `https://demo.local.deltastream.io/api/signup`
-- Anthropic base URL: `https://demo.local.deltastream.io/anthropic/`
-- DeltaStream MCP URL: `https://api-kd8j38.stage.deltastream-internal.name/mcp/v2`
+- Signup API: `https://demo.deltastream.io/api/signup`
+- Anthropic base URL: `https://demo.deltastream.io/anthropic`
+- DeltaStream MCP URL: `https://api-kap822.deltastream.io/mcp/v2`
 
 This environment uses a self-signed certificate, so TLS verification is disabled by default.
 You can override endpoints (including the Anthropic proxy for k3d) and TLS mode with env vars.
@@ -115,9 +115,9 @@ API_TOKEN="<your token>" make run
 Full override example:
 
 ```bash
-SIGNUP_API_URL="https://demo.local.deltastream.io/api/signup" \
+SIGNUP_API_URL="https://demo.deltastream.io/api/signup" \
 ANTHROPIC_BASE_URL="https://<your-k3d-anthropic-host>/anthropic/" \
-DELTASTREAM_MCP_URL="https://api-kd8j38.stage.deltastream-internal.name/mcp/v2" \
+DELTASTREAM_MCP_URL="https://api-kap822.deltastream.io/mcp/v2" \
 INSECURE_DEMO_TLS=true \
 make run
 ```
@@ -131,7 +131,7 @@ make docker-run
 
 Open `http://localhost:8501`.
 
-If `demo.local.deltastream.io` is only in your host `/etc/hosts`, the container will not see that
+If `demo.deltastream.io` is only in your host `/etc/hosts`, the container will not see that
 entry by default. Pass an explicit IP mapping when running Docker:
 
 ```bash
