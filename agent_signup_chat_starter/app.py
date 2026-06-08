@@ -12,12 +12,16 @@ from src.config import AppConfig
 from src.constants import ALLOWED_MVIEW_FQNS, DELTASTREAM_MCP_URL, INSECURE_DEMO_TLS
 from src.http_clients import allowed_relation_label, probe_anthropic, probe_mcp, signup
 
+DELTASTREAM_ICON_PATH = "assets/deltastream-favicon.png"
+
 
 def main() -> None:
-    st.set_page_config(page_title="DeltaStream Signup Chat Starter", page_icon="\U0001f916", layout="wide")
+    st.set_page_config(
+        page_title="DeltaStream Pageviews Starter", page_icon=DELTASTREAM_ICON_PATH, layout="wide"
+    )
     _init_state()
 
-    st.title("DeltaStream Signup + Chat Starter")
+    st.title("DeltaStream Pageviews Starter")
     st.caption(
         "Sign up for a demo token, paste that shared token, then chat with an agent "
         f"that can only query {allowed_relation_label()}."
@@ -43,32 +47,32 @@ def _init_state() -> None:
 
 
 def _render_signup_form() -> None:
-    st.subheader("1) Sign up")
-    with st.form("signup-form", clear_on_submit=False):
-        email = st.text_input(
-            "Email",
-            value=st.session_state.signup_email,
-            placeholder="user@example.com",
-        )
-        submitted = st.form_submit_button("Send signup email")
+    with st.expander("1) Sign up", expanded=not st.session_state.token_validated):
+        with st.form("signup-form", clear_on_submit=False):
+            email = st.text_input(
+                "Email",
+                value=st.session_state.signup_email,
+                placeholder="user@example.com",
+            )
+            submitted = st.form_submit_button("Send signup email")
 
-    st.session_state.signup_email = email
+        st.session_state.signup_email = email
 
-    if not submitted:
-        return
-    if "@" not in email:
-        st.error("Please provide a valid email address.")
-        return
-
-    with st.spinner("Submitting signup request..."):
-        try:
-            message = signup(email=email, insecure_tls=INSECURE_DEMO_TLS)
-        except Exception as exc:  # noqa: BLE001
-            st.error(str(exc))
+        if not submitted:
+            return
+        if "@" not in email:
+            st.error("Please provide a valid email address.")
             return
 
-    st.success(message)
-    st.info("After you click the confirmation link from your email, paste the API token below.")
+        with st.spinner("Submitting signup request..."):
+            try:
+                message = signup(email=email, insecure_tls=INSECURE_DEMO_TLS)
+            except Exception as exc:  # noqa: BLE001
+                st.error(str(exc))
+                return
+
+        st.success(message)
+        st.info("After you click the confirmation link from your email, paste the API token below.")
 
 
 def _render_token_panel() -> None:
@@ -138,7 +142,7 @@ def _render_chat_panel() -> None:
                             st.code(item)
 
     prompt = st.chat_input(
-        "Ask a question about the allowed materialized views",
+        "Ask a question about pageviews",
         disabled=not st.session_state.token_validated,
     )
     if not prompt:

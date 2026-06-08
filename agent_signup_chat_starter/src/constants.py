@@ -20,8 +20,7 @@ DELTASTREAM_MCP_URL = os.getenv(
 
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
 ALLOWED_MVIEW_FQNS = (
-    "testdb.public.pgmv",
-    "checkout.public.checkout_save_agent_context_mv",
+    "starter.public.pageviews_mview",
 )
 
 # demo.local endpoints use self-signed TLS certificates.
