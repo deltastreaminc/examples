@@ -1,0 +1,112 @@
+Stablecoin Payment Operations and Exception Recovery Agent (PydanticAI)
+
+1) Goal
+
+This demo shows a restart-safe payment operations flow:
+
+- Simulated offchain and onchain transfer events are written to Kafka.
+- DeltaStream builds continuously updated operational context.
+- A PydanticAI chat app reads only demo materialized views and explains what happened.
+
+Architecture:
+
+Simulated systems -> Kafka -> DeltaStream streams/changelogs -> Materialized Views -> FastAPI + PydanticAI chat UI
+
+2) Authentication and signup flow
+
+- Use the same signup/token validation pattern as agent_signup_chat_starter.
+- User signs up with email, receives token, pastes token into UI, then validates token.
+- The same token is used for:
+  - Anthropic calls
+  - DeltaStream MCP calls
+- Default endpoints:
+  - SIGNUP_API_URL=https://demo.deltastream.io/api/signup
+  - ANTHROPIC_BASE_URL=https://demo.deltastream.io/anthropic
+  - DELTASTREAM_MCP_URL=https://api-kap822.deltastream.io/mcp/v2
+
+3) Source topics
+
+- customer_profiles (CHANGELOG)
+- merchant_payment_policies (CHANGELOG)
+- wallet_risk_profiles (CHANGELOG)
+- payment_invoices (STREAM and CHANGELOG)
+- support_case_events (STREAM)
+- onchain_token_transfers (STREAM)
+
+4) Python datagen (idempotent)
+
+Directory: datagen/
+
+Requirements:
+
+- Deterministic reference data for customers, merchants, and wallet risk profiles.
+- Persist local state file (.stablecoin-payment-demo-state.json) with next scenario sequence.
+- Restart continues from next scenario id (no replayed invoice ids).
+- Scenario outcomes include valid payments and exceptions (under/overpaid, wrong chain/token, unexpected payer wallet, missing payment, duplicate payment).
+
+Make targets:
+
+- datagen-install
+- datagen-run
+- datagen-run-once
+- datagen-reset-state
+- datagen-check
+
+5) DeltaStream SQL packaging
+
+Directory: dsql/
+
+Execution order:
+
+01_database.sql
+02_sources.sql
+03_transfer_pipeline.sql
+04_invoice_enrichment_pipeline.sql
+05_final_context_changelog.sql
+06_materialized_views.sql
+07_validation_queries.sql
+08_demo_queries.sql
+
+Notes:
+
+- Keep joins two-way in continuous SQL.
+- Use upsert-mode changelogs where required.
+- Final query-time relations are materialized views.
+- All continuous DSQL statements include `QUERY WITH ('query.name' = ...)` for easy termination.
+- Teardown is in `dsql/99_teardown.sql` and `scripts/teardown_demo.sh`.
+
+6) Agent data scope and safety policy
+
+The agent must only use demo materialized views:
+
+- stablecoin_payment_ops_context_mv
+- support_case_summary_by_invoice_mv
+
+Policy:
+
+- Do not use relations outside these views.
+- If data is missing, answer that context is insufficient.
+- No guessed blockchain/payment/compliance facts.
+
+7) UI behavior
+
+- Keep existing prompt button strip.
+- Keep free-form chatbox for arbitrary questions.
+- Require token validation before chat can run.
+
+Existing demo prompts:
+
+- Show me the freshest high-priority stablecoin payment exceptions.
+- What happened with invoice inv_7350? Can we release the order?
+- Customer says they paid invoice inv_7349. What does the latest context say?
+- Why is invoice inv_7352 blocked even though payment arrived?
+- Find recent invoices where the payment arrived on the wrong chain.
+- Find recent invoices where the customer underpaid or overpaid.
+- Which payment exceptions changed most recently?
+- Does invoice inv_6323 look underpaid or overpaid right now?
+
+8) What this demo proves
+
+- Onchain transfer data can be transformed into operations-ready context.
+- DeltaStream keeps that context fresh and queryable.
+- PydanticAI can explain states and recommended actions using only approved materialized views.

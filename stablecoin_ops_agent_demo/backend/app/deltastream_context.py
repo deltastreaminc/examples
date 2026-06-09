@@ -12,11 +12,13 @@ from .settings import settings
 
 
 OPS_MV = "stablecoin_payment_ops_context_mv"
+SUPPORT_MV = "support_case_summary_by_invoice_mv"
 
 
 @dataclass
 class ContextBundle:
     ops_rows: list[dict[str, Any]]
+    support_rows: list[dict[str, Any]]
     latest_ops_row: dict[str, Any] | None
     latest_ctx_time_ms: int | None
     invoice_id: str | None
@@ -27,18 +29,32 @@ class DeltaStreamMCPService:
     def __init__(self) -> None:
         self._relation_cache: dict[str, str] = {
             OPS_MV: settings.ops_mv_fqn,
+            SUPPORT_MV: settings.support_mv_fqn,
         }
 
-    async def fetch_context(self, user_question: str) -> ContextBundle:
+    @staticmethod
+    def _normalize_relation_name(relation_name: str) -> str:
+        trimmed = relation_name.strip()
+        if trimmed.startswith('"'):
+            return trimmed
+        parts = [part.strip() for part in trimmed.split(".") if part.strip()]
+        if len(parts) == 3:
+            return f'"{parts[0]}"."{parts[1]}"."{parts[2]}"'
+        return trimmed
+
+    async def fetch_context(self, user_question: str, api_token: str) -> ContextBundle:
         invoice_id = self._extract_invoice_id(user_question)
         historical_requested = self._is_historical_request(user_question)
 
-        relation_map = await self._resolve_mv_relation_names()
+        relation_map = await self._resolve_mv_relation_names(api_token)
         ops_fqn = relation_map.get(OPS_MV, OPS_MV)
+        support_fqn = relation_map.get(SUPPORT_MV, SUPPORT_MV)
 
-        ops_rows = await self._query_mv_rows(ops_fqn)
+        ops_rows = await self._query_mv_rows(ops_fqn, api_token)
+        support_rows = await self._query_mv_rows(support_fqn, api_token)
 
         ops_rows = self._apply_query_filters(ops_rows, user_question, invoice_id)
+        support_rows = self._apply_query_filters(support_rows, user_question, invoice_id)
 
         latest_ops_row = self._pick_latest_ctx_row(ops_rows)
         latest_ctx_time_ms = None
@@ -50,13 +66,14 @@ class DeltaStreamMCPService:
 
         return ContextBundle(
             ops_rows=ops_rows,
+            support_rows=support_rows,
             latest_ops_row=latest_ops_row,
             latest_ctx_time_ms=latest_ctx_time_ms,
             invoice_id=invoice_id,
             historical_requested=historical_requested,
         )
 
-    async def _resolve_mv_relation_names(self) -> dict[str, str]:
+    async def _resolve_mv_relation_names(self, api_token: str) -> dict[str, str]:
         if self._relation_cache:
             return self._relation_cache
 
@@ -64,10 +81,10 @@ class DeltaStreamMCPService:
             "SELECT database_name, schema_name, relation_name "
             "FROM deltastream.sys.\"relations\" "
             "WHERE type = 'materialized_view' "
-            f"AND relation_name IN ('{OPS_MV}') "
+            f"AND relation_name IN ('{OPS_MV}', '{SUPPORT_MV}') "
             "LIMIT 100"
         )
-        payload = await self._call_tool("execute_dsql", {"sql": sql})
+        payload = await self._call_tool("execute_dsql", {"sql": sql}, api_token)
         rows = payload.get("rows", [])
 
         relation_map: dict[str, str] = {}
@@ -83,12 +100,10 @@ class DeltaStreamMCPService:
         self._relation_cache = relation_map
         return relation_map
 
-    async def _query_mv_rows(self, relation_name: str) -> list[dict[str, Any]]:
-        sql = f"SELECT * FROM {relation_name} LIMIT {settings.query_limit}"
-        try:
-            payload = await self._call_tool("query_mview", {"sql": sql})
-        except Exception:
-            return []
+    async def _query_mv_rows(self, relation_name: str, api_token: str) -> list[dict[str, Any]]:
+        normalized_relation_name = self._normalize_relation_name(relation_name)
+        sql = f"SELECT * FROM {normalized_relation_name} LIMIT {settings.query_limit}"
+        payload = await self._call_tool("query_mview", {"sql": sql}, api_token)
         rows = payload.get("rows", [])
         normalized: list[dict[str, Any]] = []
         for row in rows:
@@ -96,9 +111,14 @@ class DeltaStreamMCPService:
                 normalized.append(row)
         return normalized
 
-    async def _call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    async def _call_tool(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        api_token: str,
+    ) -> dict[str, Any]:
         headers = {
-            "Authorization": f"Bearer {settings.deltastream_mcp_auth_token}",
+            "Authorization": f"Bearer {api_token}",
             "Content-Type": "application/json",
         }
         async with streamablehttp_client(settings.deltastream_mcp_url, headers=headers) as transport:

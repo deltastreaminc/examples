@@ -2,7 +2,7 @@
 
 A standalone demo that uses **PydanticAI + Anthropic Sonnet 4.6** with a **DeltaStream MCP server** and a React chat UI with SSE streaming.
 
-This demo is a practical look at how you would run a stablecoin payment ops assistant in the real world. The agent is built with **PydanticAI + Anthropic Sonnet 4.6**, and it does not poke at raw systems when someone asks a question. Instead, the reconciliation work is done ahead of time in DeltaStream, and the agent reads from one clean, continuously updated context view: `stablecoin_payment_ops_context_mv`. Every row has a `ctx_time_ms` value, so answers are anchored to the latest event time reflected in context.
+This demo is a practical look at how you would run a stablecoin payment ops assistant in the real world. The agent is built with **PydanticAI + Anthropic Sonnet 4.6**, and it does not poke at raw systems when someone asks a question. Instead, the reconciliation work is done ahead of time in DeltaStream, and the agent reads from continuously updated context views: `stablecoin_payment_ops_context_mv` and `support_case_summary_by_invoice_mv`. Every row has a `ctx_time_ms` value, so answers are anchored to the latest event time reflected in context.
 
 Under the hood, the input data is simulated but realistic: customer profiles, merchant payment policies, wallet risk/compliance profiles, payment invoices, support events, and simulated onchain transfer events (chain, token, sender/receiver, amounts, confirmations, block info). Everything is timestamped in epoch milliseconds, and the generator is restart-safe, so it continues from the next scenario instead of replaying old invoice IDs. The result is an agent that can explain what happened, call out payment exceptions, and recommend next steps with guardrails, without guessing or making unsafe release recommendations.
 
@@ -27,7 +27,7 @@ http://localhost:8000  |   - Serves React frontend static files (/)    |
                        |          v                                     |
                        |  DeltaStream Context Service                  |
                        |   - MCP client (streamable HTTP)              |
-                       |   - Queries stablecoin_payment_ops_context_mv |
+                       |   - Queries both demo context MVs             |
                        +-----------------------------------------------+
                                    |                     |
                                    | HTTPS               | HTTPS
@@ -63,15 +63,17 @@ http://localhost:8000  |   - Serves React frontend static files (/)    |
                                       |
                                       v
                stablecoin_payment_ops_context_mv (materialized view)
-      - current payment ops state
-      - exception flags (wrong chain/token, under/overpaid, etc.)
-      - risk/compliance context
+      - current payment ops state, exception flags, risk/compliance context
       - freshness via ctx_time_ms
+
+               support_case_summary_by_invoice_mv (materialized view)
+      - latest support case rollup by invoice
+      - open_support_case_count and latest_support_update_time_ms
 
                                       |
                                       v
                     Backend in Docker (FastAPI + PydanticAI)
-      - queries MV via DeltaStream MCP
+      - queries both MVs via DeltaStream MCP
       - sends structured context to Anthropic Sonnet 4.6
       - applies deterministic release guardrails
       - streams answer via SSE
@@ -95,12 +97,32 @@ Core message:
 - DeltaStream makes it agent-ready.
 - PydanticAI + Anthropic Sonnet 4.6 turn it into an operational AI agent.
 
+## What the agent can answer from computed context
+
+Because the agent reads precomputed DeltaStream context (not raw source feeds), it is strongest at operational triage and reconciliation answers such as:
+
+- Invoice-level status and disposition (current `payment_ops_state`, action priority, recommended next action).
+- Release-readiness guidance with guardrails (for example valid payment ready to release vs hold for compliance review).
+- Exception diagnostics (wrong chain, wrong token, unexpected payer wallet, underpaid, overpaid, duplicate/split transfers).
+- Queue and recency views (freshest P0/P1 exceptions, most recently changed exceptions by `ctx_time_ms`).
+- Support context by invoice (`open_support_case_count`, latest support update timestamp).
+- Focused operational filters (for example, "show wrong-chain payments" or "show underpaid/overpaid invoices").
+
+Scope note: this demo is optimized for answers represented in the materialized views. It is not intended for deep raw-event forensics outside the modeled context fields.
+
 ## Setup
 
 1. Copy env file and insert real keys:
 
 ```bash
 cp .env.example .env
+```
+
+Use quoted three-part MV names in `.env` so MCP `query_mview` targets resolve correctly:
+
+```bash
+OPS_MV_FQN="stablecoin_payment_demo"."public"."stablecoin_payment_ops_context_mv"
+SUPPORT_MV_FQN="stablecoin_payment_demo"."public"."support_case_summary_by_invoice_mv"
 ```
 
 2. Install dependencies:
@@ -115,7 +137,13 @@ make install
 make dev
 ```
 
-4. Open:
+4. Start the idempotent datagen (in another shell):
+
+```bash
+make datagen-run
+```
+
+5. Open:
 
 ```text
 http://localhost:5173
@@ -125,6 +153,10 @@ http://localhost:5173
 
 - `make run` - start backend agent API only
 - `make dev` - start backend and frontend together
+- `make datagen-run` - run streaming datagen loop
+- `make datagen-run-once` - emit one scenario event
+- `make datagen-reset-state` - reset persisted datagen sequence
+- `make dsql-list` - print ordered DSQL files to execute
 - `make build-image` - build single Docker image (frontend + backend)
 - `make run-image` - run single Docker container with `.env`
 - `make stop-image` - stop backend Docker container
@@ -144,7 +176,56 @@ http://localhost:5173
 ## API
 
 - `GET /api/health`
+- `POST /api/signup`
+- `POST /api/token/validate`
 - `POST /api/chat/stream` (SSE stream with events: `start`, `context_meta`, `token`, `final`, `done`, `error`)
+
+## DSQL execution order
+
+Execute core setup files in this order:
+
+- `dsql/01_database.sql`
+- `dsql/02_sources.sql`
+- `dsql/03_transfer_pipeline.sql`
+- `dsql/04_invoice_enrichment_pipeline.sql`
+- `dsql/05_final_context_changelog.sql`
+- `dsql/06_materialized_views.sql`
+- `dsql/09_grants.sql`
+- `dsql/10_query_tags.sql`
+
+Optional read-only query files (run after core setup):
+
+- `dsql/07_validation_queries.sql`
+- `dsql/08_demo_queries.sql`
+
+Teardown:
+
+- `dsql/99_teardown.sql` terminates 14 named demo queries, then drops 2 materialized views and 20 upstream stream/changelog relations.
+- `make dsql-teardown` runs `scripts/teardown_demo.sh`.
+- Teardown uses query names (no version suffix).
+- Teardown does not revoke grants from `dsql/09_grants.sql`.
+- Per-user role provisioning/inheritance is managed by backend services; this repo only grants to `base_demo_role`.
+- DSQL relations are fully qualified under `stablecoin_payment_demo.public`.
+- All Kafka topic names use the `stablecoin_demo_` prefix.
+
+Teardown script environment variables:
+
+- `DS_API_TOKEN` (or `DS_TOKEN`) - required API token passed to every client request.
+- `DS_SERVER` - optional API endpoint override (default `https://api.local.deltastream.io/v2`).
+- `DS_ORG` - optional organization ID/name.
+- `DROP_DATABASE` - optional `true|false` flag to drop the demo DB after relation teardown (default `false`).
+- `DATABASE_NAME` - optional database name for drop step (default `stablecoin_payment_demo`).
+
+Example (kap822):
+
+```bash
+DS_SERVER="https://api-kap822.deltastream.io/v2" \
+DS_ORG="<org_id>" \
+DS_API_TOKEN="<api_token>" \
+DROP_DATABASE=true \
+DATABASE_NAME="stablecoin_payment_demo" \
+./scripts/teardown_demo.sh
+```
 
 ## Docker (single image)
 

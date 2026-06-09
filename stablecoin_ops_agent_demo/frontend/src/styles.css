@@ -43,10 +43,113 @@ body {
   color: #5e5348;
 }
 
+.scenario-note {
+  margin-top: 10px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: #3f3429;
+}
+
 .prompt-strip {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.auth-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.signup-form,
+.token-form {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.signup-form label,
+.token-form label {
+  font-size: 0.82rem;
+  color: #5f554b;
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.inline-form input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.92rem;
+}
+
+.inline-form button {
+  border: 1px solid var(--accent);
+  color: white;
+  background: linear-gradient(145deg, var(--accent), #8e4214);
+  border-radius: 10px;
+  padding: 0 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.inline-form button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: #5a5149;
+}
+
+.auth-collapsed {
+  gap: 8px;
+}
+
+.auth-title {
+  font-size: 0.82rem;
+  color: #5f554b;
+}
+
+.auth-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.status-badge {
+  border: 1px solid #7fb989;
+  background: #e8f6ea;
+  color: #1f6d2f;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  letter-spacing: 0.01em;
+}
+
+.link-button {
+  justify-self: start;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
 }
 
 .prompt-strip button {
@@ -153,6 +256,10 @@ pre {
   .app-shell {
     width: 98vw;
     margin: 10px auto 20px;
+  }
+
+  .auth-grid {
+    grid-template-columns: 1fr;
   }
 
   .chat-panel {

@@ -17,6 +17,16 @@ Your job is to help payment operations, support, risk, compliance, and merchant 
 
 You must base your answer only on the fresh context returned from DeltaStream materialized views:
 - stablecoin_payment_ops_context_mv
+- support_case_summary_by_invoice_mv
+
+Data access scope is strictly limited to this demo's materialized views.
+
+You may only use these DeltaStream materialized views:
+- stablecoin_payment_ops_context_mv
+- support_case_summary_by_invoice_mv
+
+Never generate SQL that references any relation outside these materialized views.
+If a question cannot be answered from these views, say the context is insufficient.
 
 Every context row includes Linux epoch millisecond timestamps.
 
@@ -75,6 +85,7 @@ You are not allowed to execute refunds, release orders, approve compliance revie
 """
 
 
+
 def _build_prompt(question: str, context_bundle: ContextBundle) -> str:
     payload: dict[str, Any] = {
         "user_question": question,
@@ -83,6 +94,7 @@ def _build_prompt(question: str, context_bundle: ContextBundle) -> str:
         "latest_ctx_time_ms": context_bundle.latest_ctx_time_ms,
         "latest_ops_row": context_bundle.latest_ops_row,
         "ops_rows": context_bundle.ops_rows,
+        "support_rows": context_bundle.support_rows,
     }
     serialized = json.dumps(payload, indent=2, sort_keys=True, default=str)
     return (
@@ -99,17 +111,15 @@ def _anthropic_model_name(model_name: str) -> str:
     return model_name
 
 
-agent = Agent(
-    AnthropicModel(
-        _anthropic_model_name(settings.model_name),
-        provider=AnthropicProvider(api_key=settings.anthropic_api_key),
-    ),
-    system_prompt=SYSTEM_PROMPT,
-)
+def _build_agent(api_token: str) -> Agent:
+    provider = AnthropicProvider(api_key=api_token, base_url=settings.anthropic_base_url)
+    model = AnthropicModel(_anthropic_model_name(settings.model_name), provider=provider)
+    return Agent(model, system_prompt=SYSTEM_PROMPT)
 
 
-async def stream_answer(question: str, context_bundle: ContextBundle):
+async def stream_answer(question: str, context_bundle: ContextBundle, api_token: str):
     user_prompt = _build_prompt(question, context_bundle)
+    agent = _build_agent(api_token)
     previous = ""
 
     async with agent.run_stream(user_prompt) as result:

@@ -11,6 +11,7 @@ PIP ?= $(VENV_DIR)/bin/pip
 install:
 	python3 -m venv $(VENV_DIR)
 	PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 $(PIP) install -r backend/requirements.txt
+	$(PIP) install -r datagen/requirements.txt
 	npm --prefix frontend install
 
 run:
@@ -42,3 +43,28 @@ frontend-build:
 
 backend-check:
 	$(PYTHON) -m compileall backend/app
+
+.PHONY: datagen-install datagen-run datagen-run-once datagen-reset-state datagen-check dsql-list
+
+datagen-install:
+	$(PIP) install -r datagen/requirements.txt
+
+datagen-run:
+	$(PYTHON) -m datagen.main
+
+datagen-run-once:
+	$(PYTHON) -m datagen.main --max-events 1
+
+datagen-reset-state:
+	rm -f .stablecoin-payment-demo-state.json
+
+datagen-check:
+	$(PYTHON) -m compileall datagen
+
+dsql-list:
+	@printf '%s\n' dsql/01_database.sql dsql/02_sources.sql dsql/03_transfer_pipeline.sql dsql/04_invoice_enrichment_pipeline.sql dsql/05_final_context_changelog.sql dsql/06_materialized_views.sql dsql/09_grants.sql dsql/10_query_tags.sql dsql/07_validation_queries.sql dsql/08_demo_queries.sql
+
+.PHONY: dsql-teardown
+
+dsql-teardown:
+	./scripts/teardown_demo.sh

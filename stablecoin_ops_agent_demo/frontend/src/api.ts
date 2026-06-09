@@ -1,5 +1,34 @@
 import type { StreamResult } from './types'
 
+export async function signup(email: string): Promise<string> {
+  const response = await fetch('/api/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
+  if (!response.ok) {
+    const detail = typeof payload.detail === 'string' ? payload.detail : `status ${response.status}`
+    throw new Error(`Signup failed: ${detail}`)
+  }
+  if (typeof payload.message === 'string' && payload.message.trim()) {
+    return payload.message
+  }
+  return 'Signup succeeded. Check your email to confirm your address.'
+}
+
+export async function validateToken(token: string): Promise<void> {
+  const response = await fetch('/api/token/validate', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
+    const detail = typeof payload.detail === 'string' ? payload.detail : `status ${response.status}`
+    throw new Error(`Token validation failed: ${detail}`)
+  }
+}
+
 function parseEventBlock(block: string): { event: string; data: unknown } | null {
   const lines = block.split('\n')
   let event = 'message'
@@ -27,11 +56,15 @@ function parseEventBlock(block: string): { event: string; data: unknown } | null
 
 export async function streamChat(
   message: string,
+  token: string,
   onToken: (delta: string) => void,
 ): Promise<StreamResult> {
   const response = await fetch('/api/chat/stream', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({ message }),
   })
 
