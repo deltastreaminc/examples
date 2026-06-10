@@ -1,4 +1,0 @@
-streamlit>=1.45.0
-pydantic>=2.7.0
-pydantic-ai-slim[anthropic,mcp]>=0.0.20
-httpx>=0.27.0
