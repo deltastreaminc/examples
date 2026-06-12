@@ -1,0 +1,279 @@
+:root {
+  color-scheme: light;
+  --bg: #f4efe6;
+  --panel: #fffdfa;
+  --ink: #1e1a16;
+  --accent: #bb5a1d;
+  --accent-soft: #f4d7c3;
+  --line: #dbcdbc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top right, #fff3e6, var(--bg));
+  color: var(--ink);
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+}
+
+.app-shell {
+  width: min(1040px, 96vw);
+  margin: 24px auto;
+  display: grid;
+  gap: 14px;
+}
+
+.app-header {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.app-header p {
+  margin: 6px 0 0;
+  color: #5e5348;
+}
+
+.scenario-note {
+  margin-top: 10px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: #3f3429;
+}
+
+.prompt-strip {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.auth-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.signup-form,
+.token-form {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.signup-form label,
+.token-form label {
+  font-size: 0.82rem;
+  color: #5f554b;
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.inline-form input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.92rem;
+}
+
+.inline-form button {
+  border: 1px solid var(--accent);
+  color: white;
+  background: linear-gradient(145deg, var(--accent), #8e4214);
+  border-radius: 10px;
+  padding: 0 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.inline-form button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: #5a5149;
+}
+
+.auth-collapsed {
+  gap: 8px;
+}
+
+.auth-title {
+  font-size: 0.82rem;
+  color: #5f554b;
+}
+
+.auth-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.status-badge {
+  border: 1px solid #7fb989;
+  background: #e8f6ea;
+  color: #1f6d2f;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  letter-spacing: 0.01em;
+}
+
+.link-button {
+  justify-self: start;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.prompt-strip button {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 999px;
+  font-size: 0.84rem;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.prompt-strip button:hover {
+  border-color: var(--accent);
+}
+
+.chat-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  min-height: 56vh;
+  max-height: 56vh;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.message {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.message.user {
+  background: #fff7ef;
+}
+
+.message.assistant {
+  background: #fafcff;
+}
+
+.meta {
+  font-size: 0.75rem;
+  color: #6a5e53;
+  margin-bottom: 4px;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+  font-size: 0.9rem;
+}
+
+.freshness {
+  margin-top: 8px;
+  color: #0d4c46;
+  font-size: 0.8rem;
+}
+
+.chat-input {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+}
+
+.chat-input input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 0.95rem;
+}
+
+.chat-input button {
+  border: 1px solid var(--accent);
+  color: white;
+  background: linear-gradient(145deg, var(--accent), #8e4214);
+  border-radius: 10px;
+  padding: 0 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-input button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.chat-input .secondary-button {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.chat-input .secondary-button:hover {
+  border-color: var(--accent);
+}
+
+.error {
+  color: #9a1a1a;
+  background: #ffefef;
+  border: 1px solid #f2c2c2;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.empty-state {
+  color: #4f463d;
+  padding: 8px;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    width: 98vw;
+    margin: 10px auto 20px;
+  }
+
+  .auth-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-panel {
+    min-height: 48vh;
+    max-height: 48vh;
+  }
+}

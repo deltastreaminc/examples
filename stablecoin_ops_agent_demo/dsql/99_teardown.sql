@@ -1,0 +1,46 @@
+-- Terminate named continuous queries for this demo.
+-- Note: DeltaStream DROP syntax does not support IF EXISTS.
+
+TERMINATE QUERY stablecoin_demo_confirmed_token_transfers;
+TERMINATE QUERY stablecoin_demo_transfer_invoice_matches;
+TERMINATE QUERY stablecoin_demo_transfer_reconciliation_by_invoice;
+TERMINATE QUERY stablecoin_demo_support_case_summary_by_invoice;
+TERMINATE QUERY stablecoin_demo_invoice_customer_context;
+TERMINATE QUERY stablecoin_demo_invoice_customer_merchant_context;
+TERMINATE QUERY stablecoin_demo_invoice_customer_merchant_risk_context;
+TERMINATE QUERY stablecoin_demo_transfer_invoice_context;
+TERMINATE QUERY stablecoin_demo_transfer_invoice_customer_context;
+TERMINATE QUERY stablecoin_demo_transfer_invoice_customer_merchant_context;
+TERMINATE QUERY stablecoin_demo_transfer_full_context;
+TERMINATE QUERY stablecoin_demo_transfer_payment_ops_context;
+TERMINATE QUERY stablecoin_demo_payment_ops_context_mv;
+TERMINATE QUERY stablecoin_demo_support_case_summary_mv;
+
+-- Drop views first.
+DROP MATERIALIZED VIEW stablecoin_payment_demo.public.support_case_summary_by_invoice_mv;
+DROP MATERIALIZED VIEW stablecoin_payment_demo.public.stablecoin_payment_ops_context_mv;
+
+-- Drop downstream changelogs and streams.
+DROP CHANGELOG stablecoin_payment_demo.public.transfer_payment_ops_context_c;
+DROP CHANGELOG stablecoin_payment_demo.public.transfer_full_context_c;
+DROP CHANGELOG stablecoin_payment_demo.public.transfer_invoice_customer_merchant_context_c;
+DROP CHANGELOG stablecoin_payment_demo.public.transfer_invoice_customer_context_c;
+DROP CHANGELOG stablecoin_payment_demo.public.transfer_invoice_context_c;
+DROP CHANGELOG stablecoin_payment_demo.public.support_case_summary_by_invoice_c;
+DROP CHANGELOG stablecoin_payment_demo.public.transfer_reconciliation_by_invoice_c;
+
+DROP STREAM stablecoin_payment_demo.public.invoice_customer_merchant_risk_context_s;
+DROP STREAM stablecoin_payment_demo.public.invoice_customer_merchant_context_s;
+DROP STREAM stablecoin_payment_demo.public.invoice_customer_context_s;
+DROP STREAM stablecoin_payment_demo.public.transfer_invoice_matches_s;
+DROP STREAM stablecoin_payment_demo.public.confirmed_token_transfers_s;
+
+-- Drop source relations.
+DROP STREAM stablecoin_payment_demo.public.support_case_events_s;
+DROP CHANGELOG stablecoin_payment_demo.public.wallet_risk_profiles_c;
+DROP CHANGELOG stablecoin_payment_demo.public.merchant_payment_policies_c;
+DROP CHANGELOG stablecoin_payment_demo.public.customer_profiles_c;
+DROP CHANGELOG stablecoin_payment_demo.public.payment_invoices_by_address_c;
+DROP CHANGELOG stablecoin_payment_demo.public.payment_invoices_by_invoice_c;
+DROP STREAM stablecoin_payment_demo.public.payment_invoices_s;
+DROP STREAM stablecoin_payment_demo.public.onchain_token_transfers_s;
