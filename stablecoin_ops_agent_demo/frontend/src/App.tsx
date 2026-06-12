@@ -5,13 +5,13 @@ import type { ChatMessage } from './types'
 
 const PROMPTS = [
   'Show me the freshest high-priority stablecoin payment exceptions.',
-  'What happened with this invoice? Can we release the order?',
-  'Customer says they paid this invoice. What does the latest context say?',
-  'Why is this invoice blocked even though payment arrived?',
+  'What happened with the most recent invoice? Can we release the order?',
+  'Customer says they paid the most recent invoice. What does the latest context say?',
+  'Why is the most recent invoice blocked even though payment arrived?',
   'Find recent invoices where the payment arrived on the wrong chain.',
   'Find recent invoices where the customer underpaid or overpaid.',
   'Which payment exceptions changed most recently?',
-  'Does this invoice look underpaid or overpaid right now?',
+  'Does the most recent invoice look underpaid or overpaid right now?',
 ]
 
 const createId = () =>
