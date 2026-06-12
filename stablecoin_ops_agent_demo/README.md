@@ -6,6 +6,27 @@ This demo is a practical look at how you would run a stablecoin payment ops assi
 
 Under the hood, the input data is simulated but realistic: customer profiles, merchant payment policies, wallet risk/compliance profiles, payment invoices, support events, and simulated onchain transfer events (chain, token, sender/receiver, amounts, confirmations, block info). Everything is timestamped in epoch milliseconds, and the generator is restart-safe, so it continues from the next scenario instead of replaying old invoice IDs. The result is an agent that can explain what happened, call out payment exceptions, and recommend next steps with guardrails, without guessing or making unsafe release recommendations.
 
+## Demo quickstart
+
+Run the demo locally with Docker:
+
+```bash
+docker run --rm -p 8000:8000 public.ecr.aws/i3m5v2n6/deltastreaminc/stablecoin-ops-agent-demo:latest
+```
+
+Then:
+
+1. Open `http://localhost:8000`.
+2. Enter your email in the **Signup email** box and submit.
+3. Follow the instructions in the signup email you receive.
+4. Paste the issued access key/token into the **Access token** box.
+5. Click **Validate token**, then start chatting.
+
+Notes:
+
+- If you lose your access token, submit the same email in the **Signup email** box again to request a new one.
+- Per-minute request limits are enforced by the upstream demo services; this app code does not currently define its own in-process per-minute cap.
+
 ## High-level architecture
 
 ```text

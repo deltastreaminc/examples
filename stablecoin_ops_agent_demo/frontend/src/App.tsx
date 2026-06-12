@@ -140,6 +140,15 @@ export default function App() {
     await sendMessage(input)
   }
 
+  const onClearChat = () => {
+    if (isStreaming) {
+      return
+    }
+    setMessages([])
+    setInput('')
+    setError(null)
+  }
+
   useEffect(() => {
     const panel = chatPanelRef.current
     if (!panel) {
@@ -267,6 +276,14 @@ export default function App() {
           placeholder="Ask about an invoice or payment exception..."
           disabled={isStreaming || !isValidated}
         />
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={onClearChat}
+          disabled={isStreaming || messages.length === 0}
+        >
+          Clear chat
+        </button>
         <button type="submit" disabled={!canSend}>
           {isStreaming ? 'Streaming...' : 'Send'}
         </button>

@@ -213,7 +213,7 @@ pre {
 
 .chat-input {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 8px;
 }
 
@@ -237,6 +237,16 @@ pre {
 .chat-input button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.chat-input .secondary-button {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.chat-input .secondary-button:hover {
+  border-color: var(--accent);
 }
 
 .error {
