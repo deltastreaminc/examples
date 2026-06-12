@@ -78,8 +78,26 @@ http://localhost:8000  |   - Serves React frontend static files (/)    |
 
                                       |
                                       v
-                         DeltaStream Ingestion + Modeling
+                          DeltaStream Ingestion + Modeling
          (streams/changelogs, transfer matching, reconciliation, enrichment)
+
+  Key pipeline steps:
+  1) Confirmed transfer filter:
+     - keeps non-removed transfers with required confirmation depth
+     - focuses on supported stablecoins (USDC/USDT)
+  2) Invoice matching and reconciliation:
+     - joins confirmed transfers to invoice payment addresses
+     - computes invoice-level aggregates (matched count, total received, latest block)
+     - derives exception flags (wrong chain/token, unexpected payer wallet)
+  3) Customer/merchant/risk enrichment:
+     - joins invoice+transfer context with customer profiles and merchant policies
+     - joins expected payer wallet to wallet risk/compliance profiles
+  4) Payment ops dispositioning:
+     - computes payment_ops_state and action_priority from reconciliation + risk/compliance context
+     - attaches recommended_next_action guidance for support/ops workflows
+  5) Materialized view serving layer:
+     - stablecoin_payment_ops_context_mv exposes latest per-invoice operational context
+     - support_case_summary_by_invoice_mv exposes invoice-level support case rollups
 
                                       |
                                       v
@@ -130,6 +148,23 @@ Because the agent reads precomputed DeltaStream context (not raw source feeds), 
 - Focused operational filters (for example, "show wrong-chain payments" or "show underpaid/overpaid invoices").
 
 Scope note: this demo is optimized for answers represented in the materialized views. It is not intended for deep raw-event forensics outside the modeled context fields.
+
+## Intelligence contained in the MViews
+
+`stablecoin_payment_ops_context_mv` is the primary operational intelligence layer for the agent. It captures:
+
+- Payment disposition intelligence (`payment_ops_state`, `action_priority`, `recommended_next_action`).
+- Expected payment intent (expected chain/token/amount, payment address, expected payer wallet).
+- Observed transfer outcome (total received, matched transfer count, latest transfer/block metadata).
+- Exception classification signals (wrong chain, wrong token, unexpected payer wallet, amount mismatch, duplicate/split transfer patterns).
+- Risk/compliance context (wallet risk score, risk band, compliance state, risk reason).
+- Entity context (invoice/customer/merchant identifiers and key profile attributes).
+- Freshness metadata (`ctx_time_ms` as latest reflected source-event timestamp for the row).
+
+`support_case_summary_by_invoice_mv` provides support-side operational intelligence:
+
+- Open support case count per invoice.
+- Latest support update timestamp per invoice.
 
 ## Setup
 
