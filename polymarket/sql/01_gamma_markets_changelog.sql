@@ -4,9 +4,9 @@
 -- order enrichment starts.
 --
 -- Raw Polymarket Gamma markets changelog over the current warpstream topic.
--- Field list is based on live samples from demo_polymarket_gamma_markets.
+-- Field list is based on live samples from demo_pm_gamma_markets.
 -- Protected upstream source topic: never delete, truncate, or repurpose
--- demo_polymarket_gamma_markets from this project.
+-- demo_pm_gamma_markets from this project.
 --
 -- Important: this raw-topic relation preserves the source JSON field names
 -- exactly, including case. Any snake_case cleanup should happen in a derived
@@ -206,9 +206,9 @@ CREATE CHANGELOG polymarket.public.pm_gamma_markets_cl (
   PRIMARY KEY ("conditionId")
 ) WITH (
   'store' = 'warpstream',
-  'topic' = 'demo_polymarket_gamma_markets',
+  'topic' = 'demo_pm_gamma_markets',
   'value.format' = 'json'
 );
 
 ALTER RELATION pm_gamma_markets_cl SET description =
-'Raw Polymarket Gamma market changelog over warpstream topic demo_polymarket_gamma_markets. Primary key is conditionId from the Kafka message key/value payload.';
+'Raw Polymarket Gamma market changelog over warpstream topic demo_pm_gamma_markets. Primary key is conditionId from the Kafka message key/value payload.';

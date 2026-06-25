@@ -24,7 +24,7 @@ for the general case and is not the main enrichment strategy.
 
 ## SQL Files
 
-- `sql/01_gamma_markets_changelog.sql` - phase 1: raw Gamma changelog on `demo_polymarket_gamma_markets`
+- `sql/01_gamma_markets_changelog.sql` - phase 1: raw Gamma changelog on `demo_pm_gamma_markets`
 - `sql/02_gamma_token_pipeline.sql` - phase 2: Gamma token normalization into `token_id -> market_question`
 - `sql/03_mv2_gamma_enriched_draft.sql` - phase 3: order source, changelog-join enrichment, and validation MV
 - `sql/04_mv1_demo_earliest.sql` - historical order-only baseline pipeline
@@ -37,7 +37,7 @@ repurposed by this project:
 
 - `demo_pm_orders_filled`
 - `demo_pm_orders_matched`
-- `demo_polymarket_gamma_markets`
+- `demo_pm_gamma_markets`
 
 Any derived or helper relations in this repo should write to separate sink
 topics. Cleanup or teardown workflows must not target the protected source

@@ -18,7 +18,7 @@
 --    metadata payload.
 --
 -- Protected upstream source topics: demo_pm_orders_filled,
--- demo_pm_orders_matched, and demo_polymarket_gamma_markets must never be
+-- demo_pm_orders_matched, and demo_pm_gamma_markets must never be
 -- deleted, truncated, or repurposed from this project.
 
 USE DATABASE polymarket;

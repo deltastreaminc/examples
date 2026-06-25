@@ -21,7 +21,7 @@
 --    manual prereq until the file-upload path is resolved.
 --
 -- Protected upstream source topics: demo_pm_orders_filled,
--- demo_pm_orders_matched, and demo_polymarket_gamma_markets must never be
+-- demo_pm_orders_matched, and demo_pm_gamma_markets must never be
 -- deleted, truncated, or repurposed from this project.
 
 USE DATABASE polymarket;
@@ -69,6 +69,8 @@ CREATE STREAM polymarket.public.pm_gamma_markets_s (
   "clobTokenIds" STRING,
   "sportsMarketType" STRING,
   line DOUBLE,
+  active BOOLEAN,
+  closed BOOLEAN,
   "updatedAt" STRING,
   events ARRAY<STRUCT<
     title STRING,
@@ -78,7 +80,7 @@ CREATE STREAM polymarket.public.pm_gamma_markets_s (
   >>
 ) WITH (
   'store' = 'warpstream',
-  'topic' = 'demo_polymarket_gamma_markets',
+  'topic' = 'demo_pm_gamma_markets',
   'value.format' = 'json'
 );
 
