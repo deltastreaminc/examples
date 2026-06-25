@@ -1,0 +1,28 @@
+Polymarket Live Signal Radar design
+
+Purpose
+- Explain live Polymarket activity using DeltaStream-precomputed context.
+- Keep the runtime app simple: fetch materialized views, package context, ask the model, stream the answer.
+
+Runtime views
+- Primary: pm_live_signal_radar_mv
+- Drill-down: pm_wallet_asset_flow_mv, pm_wallet_activity_mv, pm_recent_fills_mv, pm_market_asset_metadata_mv, pm_user_balances_mv
+
+Key runtime rules
+- Broad questions use pm_live_signal_radar_mv.
+- Freshness is anchored to ctx_time_ms.
+- Broad rankings should operate on the latest row per asset, not all historical windows.
+- Driver analysis uses wallet-asset flow first, wallet-activity second.
+- Raw evidence uses recent fills only.
+- The app should describe large-fill-driven or concentrated activity, not say manipulation detected.
+- The app must not give betting or financial advice.
+
+Template reuse from stablecoin demo
+- Keep FastAPI + React + SSE shell.
+- Keep signup and token validation flow.
+- Replace stablecoin prompt, invoice filters, and release guardrails.
+
+Implementation notes
+- MV names are hardcoded for this demo.
+- SQL statements are preserved verbatim and only split into smaller files.
+- The backend fetch layer resolves fully qualified MV names through deltastream.sys.relations when available.
