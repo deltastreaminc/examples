@@ -10,7 +10,7 @@ VENV_DIR ?= .venv
 PYTHON ?= $(VENV_DIR)/bin/python
 PIP ?= $(VENV_DIR)/bin/pip
 
-.PHONY: install dev run ecr-login buildx-builder build-image build-image-local push-image run-image stop-image health frontend-build backend-check dsql-list
+.PHONY: install dev run ecr-login buildx-builder build-image build-image-clean build-image-local push-image run-image stop-image health frontend-build backend-check dsql-list
 
 install:
 	python3 -m venv $(VENV_DIR)
@@ -36,6 +36,9 @@ ecr-login:
 build-image: ecr-login buildx-builder
 	docker buildx build --builder $${BUILDER_NAME:-$(BUILDER_NAME)} --platform $${PLATFORMS:-$(PLATFORMS)} -f backend/Dockerfile -t $${IMAGE_NAME:-$(IMAGE_NAME)} --push .
 
+build-image-clean: ecr-login buildx-builder
+	docker buildx build --no-cache --builder $${BUILDER_NAME:-$(BUILDER_NAME)} --platform $${PLATFORMS:-$(PLATFORMS)} -f backend/Dockerfile -t $${IMAGE_NAME:-$(IMAGE_NAME)} --push .
+
 build-image-local: buildx-builder
 	docker buildx build --builder $${BUILDER_NAME:-$(BUILDER_NAME)} --platform $${LOCAL_PLATFORM:-$(LOCAL_PLATFORM)} -f backend/Dockerfile -t $${IMAGE_NAME:-$(IMAGE_NAME)} --load .
 
@@ -58,4 +61,4 @@ backend-check:
 	$(PYTHON) -m compileall backend/app
 
 dsql-list:
-	@printf '%s\n' dsql/01_sources.sql dsql/02_normalization.sql dsql/03_metadata.sql dsql/04_flow_windows.sql dsql/05_signal_context.sql dsql/06_materialized_views.sql
+	@printf '%s\n' dsql/01_sources.sql dsql/02_normalization.sql dsql/03_metadata.sql dsql/04_flow_windows.sql dsql/05_signal_context.sql dsql/06_materialized_views.sql dsql/09_grants.sql

@@ -27,6 +27,7 @@ def probe_anthropic(api_token: str, anthropic_base_url: str, insecure_tls: bool)
         headers={
             "Authorization": f"Bearer {api_token}",
             "x-api-key": api_token,
+            "anthropic-version": "2023-06-01",
         },
         verify=not insecure_tls,
         timeout=20.0,
@@ -41,6 +42,52 @@ def probe_anthropic(api_token: str, anthropic_base_url: str, insecure_tls: bool)
     if response.status_code >= 400:
         detail = _extract_error(response)
         raise RuntimeError(f"Anthropic token check failed ({response.status_code}): {detail}")
+
+
+def probe_gemini(
+    api_token: str,
+    gemini_base_url: str,
+    model_name: str,
+    insecure_tls: bool,
+) -> None:
+    # The demo /gemini gateway only proxies the `:generateContent` surface, not the
+    # `/v1beta/models` listing, so validate the token with a minimal generation call.
+    generate_url = (
+        f"{gemini_base_url.rstrip('/')}/v1beta/models/{model_name}:generateContent"
+    )
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": "ping"}]}],
+        "generationConfig": {"maxOutputTokens": 1},
+    }
+    with httpx.Client(
+        headers={
+            "Authorization": f"Bearer {api_token}",
+            "content-type": "application/json",
+        },
+        verify=not insecure_tls,
+        timeout=20.0,
+    ) as client:
+        try:
+            response = client.post(generate_url, json=payload)
+        except httpx.HTTPError as exc:
+            raise RuntimeError(
+                f"Gemini endpoint request failed for `{generate_url}`: {exc}"
+            ) from exc
+
+    # 200 means the token works. 400 means the request reached the model but the tiny
+    # probe body was rejected, which still proves auth succeeded. Only treat auth and
+    # routing failures as fatal.
+    if response.status_code in (401, 403):
+        detail = _extract_error(response)
+        raise RuntimeError(f"Gemini token check failed ({response.status_code}): {detail}")
+    if response.status_code == 404:
+        raise RuntimeError(
+            f"Gemini endpoint not found (404) for `{generate_url}`. "
+            "Check GEMINI_BASE_URL and the model name."
+        )
+    if response.status_code >= 500:
+        detail = _extract_error(response)
+        raise RuntimeError(f"Gemini endpoint check failed ({response.status_code}): {detail}")
 
 
 def probe_mcp(api_token: str, mcp_url: str, insecure_tls: bool) -> None:

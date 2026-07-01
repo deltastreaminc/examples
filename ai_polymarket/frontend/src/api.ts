@@ -1,4 +1,27 @@
-import type { StreamResult } from './types'
+import type { DocSearchQuery, LlmTimingEvent, SqlStatement, StreamResult } from './types'
+
+// Routing model for this deployment:
+// - Token validation and signup are served by the demo platform at the host root
+//   (/api/*) — NOT by this container. They use root-absolute paths.
+// - The chat endpoint is served by THIS container, which may be mounted under a
+//   path prefix (e.g. /polymarket/). The prefix is injected at runtime by the
+//   backend as window.__APP_BASE__ (always ends with '/'; "/" when at root), so a
+//   single build works at any mount path without a build-time base.
+const appBase = (): string => {
+  const base = (globalThis as unknown as { __APP_BASE__?: string }).__APP_BASE__
+  return typeof base === 'string' && base ? base : '/'
+}
+const containerApiUrl = (path: string): string => `${appBase()}${path.replace(/^\//, '')}`
+
+export class PartialStreamError extends Error {
+  partialText: string
+
+  constructor(message: string, partialText: string) {
+    super(message)
+    this.name = 'PartialStreamError'
+    this.partialText = partialText
+  }
+}
 
 export async function signup(email: string): Promise<string> {
   const response = await fetch('/api/signup', {
@@ -18,39 +41,20 @@ export async function signup(email: string): Promise<string> {
 }
 
 export async function validateToken(token: string): Promise<void> {
+  // Served by the demo platform at the host root (/api/token/validate).
   const response = await fetch('/api/token/validate', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
-    const detail = typeof payload.detail === 'string' ? payload.detail : `status ${response.status}`
+  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
+  if (!response.ok || payload.valid === false) {
+    const detail =
+      typeof payload.detail === 'string'
+        ? payload.detail
+        : typeof payload.message === 'string'
+          ? payload.message
+          : `status ${response.status}`
     throw new Error(`Token validation failed: ${detail}`)
-  }
-}
-
-function parseEventBlock(block: string): { event: string; data: unknown } | null {
-  const lines = block.split('\n')
-  let event = 'message'
-  const dataLines: string[] = []
-
-  for (const line of lines) {
-    if (line.startsWith('event:')) {
-      event = line.slice(6).trim()
-    }
-    if (line.startsWith('data:')) {
-      dataLines.push(line.slice(5).trim())
-    }
-  }
-
-  if (!dataLines.length) {
-    return null
-  }
-
-  try {
-    return { event, data: JSON.parse(dataLines.join('\n')) }
-  } catch {
-    return null
   }
 }
 
@@ -58,98 +62,120 @@ export async function streamChat(
   message: string,
   token: string,
   onToken: (delta: string) => void,
+  onSql: (statement: SqlStatement) => void,
+  onDocSearch: (query: DocSearchQuery) => void,
+  onLlmTiming: (timing: LlmTimingEvent) => void,
+  onReset?: () => void,
 ): Promise<StreamResult> {
-  const response = await fetch('/api/chat/stream', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ message }),
-  })
+  let finalText = ''
+  let streamedText = ''
 
-  if (!response.ok || !response.body) {
-    throw new Error(`Request failed with status ${response.status}`)
+  // Apply a single {event, data} item. Returns the message of a terminal error
+  // event (caller should stop and surface a PartialStreamError), or null.
+  const applyEvent = (event: string, data: Record<string, unknown>): string | null => {
+    if (event === 'reset') {
+      streamedText = ''
+      finalText = ''
+      onReset?.()
+    } else if (event === 'token') {
+      const text = data.text
+      if (typeof text === 'string') {
+        streamedText += text
+        onToken(text)
+      }
+    } else if (event === 'sql') {
+      const statement = data.statement
+      if (typeof statement === 'string') {
+        onSql({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, statement })
+      }
+    } else if (event === 'doc_search') {
+      const query = data.query
+      if (typeof query === 'string') {
+        onDocSearch({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, query })
+      }
+    } else if (event === 'llm_timing') {
+      const kind = data.kind
+      const durationMs = data.duration_ms
+      if ((kind === 'attempt' || kind === 'summary') && typeof durationMs === 'number') {
+        onLlmTiming({
+          kind,
+          durationMs,
+          attempt: typeof data.attempt === 'number' ? data.attempt : undefined,
+          attempts: typeof data.attempts === 'number' ? data.attempts : undefined,
+          accepted: typeof data.accepted === 'boolean' ? data.accepted : undefined,
+          hadDataQuery: typeof data.had_data_query === 'boolean' ? data.had_data_query : undefined,
+          outputChars: typeof data.output_chars === 'number' ? data.output_chars : undefined,
+        })
+      }
+    } else if (event === 'final') {
+      if (typeof data.text === 'string') {
+        finalText = data.text
+      }
+    } else if (event === 'error') {
+      return typeof data.message === 'string' ? data.message : 'Unknown streaming error'
+    }
+    return null
   }
 
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
+  // 1) Start the chat as a background job.
+  const startResponse = await fetch(containerApiUrl('/api/chat/start'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ message }),
+  })
+  if (!startResponse.ok) {
+    const payload = (await startResponse.json().catch(() => ({}))) as Record<string, unknown>
+    const detail = typeof payload.detail === 'string' ? payload.detail : `status ${startResponse.status}`
+    throw new Error(`Chat request failed: ${detail}`)
+  }
+  const startPayload = (await startResponse.json()) as { job_id?: string }
+  const jobId = startPayload.job_id
+  if (!jobId) {
+    throw new Error('Chat request failed: missing job id')
+  }
 
-  let buffer = ''
-  let finalText = ''
-  let latestCtxTimeMs: number | null = null
-  let questionMode: string | null = null
-  let queriedViews: string[] = []
+  // 2) Poll for buffered events in short requests until the job finishes.
+  let cursor = 0
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
   while (true) {
-    const { value, done } = await reader.read()
-    if (done) {
-      break
+    const pollResponse = await fetch(
+      containerApiUrl(`/api/chat/poll/${jobId}?cursor=${cursor}`),
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    if (!pollResponse.ok) {
+      const message = `Chat polling failed: status ${pollResponse.status}`
+      const partial = finalText || streamedText
+      if (partial) {
+        throw new PartialStreamError(message, partial)
+      }
+      throw new Error(message)
     }
-    buffer += decoder.decode(value, { stream: true })
 
-    const blocks = buffer.split('\n\n')
-    buffer = blocks.pop() ?? ''
+    const data = (await pollResponse.json()) as {
+      events?: Array<{ event?: string; data?: Record<string, unknown> }>
+      cursor?: number
+      status?: string
+    }
+    cursor = typeof data.cursor === 'number' ? data.cursor : cursor
 
-    for (const block of blocks) {
-      const parsed = parseEventBlock(block)
-      if (!parsed || typeof parsed.data !== 'object' || parsed.data === null) {
+    for (const item of data.events ?? []) {
+      if (!item || typeof item.event !== 'string') {
         continue
       }
-
-      const payload = parsed.data as Record<string, unknown>
-
-      if (parsed.event === 'token') {
-        const text = payload.text
-        if (typeof text === 'string') {
-          onToken(text)
-        }
-      }
-
-      if (parsed.event === 'context_meta') {
-        const ctxValue = payload.latest_ctx_time_ms
-        if (typeof ctxValue === 'number') {
-          latestCtxTimeMs = ctxValue
-        }
-        if (typeof payload.question_mode === 'string') {
-          questionMode = payload.question_mode
-        }
-        if (Array.isArray(payload.queried_views)) {
-          queriedViews = payload.queried_views.filter((value): value is string => typeof value === 'string')
-        }
-      }
-
-      if (parsed.event === 'final') {
-        const text = payload.text
-        if (typeof text === 'string') {
-          finalText = text
-        }
-        const ctxValue = payload.latest_ctx_time_ms
-        if (typeof ctxValue === 'number') {
-          latestCtxTimeMs = ctxValue
-        }
-        if (typeof payload.question_mode === 'string') {
-          questionMode = payload.question_mode
-        }
-        if (Array.isArray(payload.queried_views)) {
-          queriedViews = payload.queried_views.filter((value): value is string => typeof value === 'string')
-        }
-      }
-
-      if (parsed.event === 'error') {
-        const messageValue = payload.message
-        if (typeof messageValue === 'string') {
-          throw new Error(messageValue)
-        }
-        throw new Error('Unknown streaming error')
+      const errorMessage = applyEvent(item.event, item.data ?? {})
+      if (errorMessage !== null) {
+        throw new PartialStreamError(errorMessage, finalText || streamedText)
       }
     }
+
+    if (data.status === 'done' || data.status === 'error') {
+      break
+    }
+    await sleep(700)
   }
 
   return {
-    text: finalText,
-    latestCtxTimeMs,
-    questionMode,
-    queriedViews,
+    text: finalText || streamedText,
   }
 }

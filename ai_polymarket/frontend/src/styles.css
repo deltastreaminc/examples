@@ -296,6 +296,14 @@ code {
   padding: 18px;
 }
 
+.section-header-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .context-list {
   margin: 14px 0 0;
   padding-left: 18px;
@@ -304,6 +312,54 @@ code {
 
 .context-list li + li {
   margin-top: 8px;
+}
+
+.sql-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.timing-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.timing-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.timing-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.timing-value {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.timing-meta {
+  grid-column: 1 / -1;
+  font-size: 0.79rem;
+  color: var(--muted);
+}
+
+.sql-block {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #f8fbff;
+  overflow-x: auto;
 }
 
 .inline-form {
@@ -481,6 +537,12 @@ pre {
   line-height: 1.45;
 }
 
+.thinking-state {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-style: italic;
+}
+
 .freshness,
 .queried-views {
   margin-top: 8px;
@@ -507,6 +569,10 @@ pre {
   border: 1px solid #f2d3cf;
   border-radius: 16px;
   padding: 10px;
+}
+
+.form-error {
+  margin-bottom: 10px;
 }
 
 .empty-state {

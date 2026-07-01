@@ -4,14 +4,28 @@ export interface ChatMessage {
   id: string
   role: Role
   text: string
-  latestCtxTimeMs?: number | null
-  questionMode?: string | null
-  queriedViews?: string[]
 }
 
 export interface StreamResult {
   text: string
-  latestCtxTimeMs: number | null
-  questionMode: string | null
-  queriedViews: string[]
+}
+
+export interface SqlStatement {
+  id: string
+  statement: string
+}
+
+export interface DocSearchQuery {
+  id: string
+  query: string
+}
+
+export interface LlmTimingEvent {
+  kind: 'attempt' | 'summary'
+  attempt?: number
+  attempts?: number
+  durationMs: number
+  accepted?: boolean
+  hadDataQuery?: boolean
+  outputChars?: number
 }

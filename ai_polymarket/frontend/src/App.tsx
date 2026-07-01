@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 
-import { signup, streamChat, validateToken } from './api'
-import type { ChatMessage } from './types'
+import { PartialStreamError, signup, streamChat, validateToken } from './api'
+import type { ChatMessage, LlmTimingEvent, SqlStatement } from './types'
 
 function DeltaStreamLogo() {
   return (
@@ -40,7 +40,6 @@ const PROMPTS = [
   'Give me the freshest signals instead of the highest score.',
   'Who is driving activity in this market?',
   'Show recent fills behind this signal.',
-  'What market metadata do we have for this asset?',
 ]
 
 const createId = () =>
@@ -48,6 +47,9 @@ const createId = () =>
 
 export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [sqlStatements, setSqlStatements] = useState<SqlStatement[]>([])
+  const [isSqlCollapsed, setIsSqlCollapsed] = useState(true)
+  const [llmTimingEvents, setLlmTimingEvents] = useState<LlmTimingEvent[]>([])
   const [input, setInput] = useState('')
   const [email, setEmail] = useState('')
   const [token, setToken] = useState('')
@@ -59,6 +61,7 @@ export default function App() {
   const [isSigningUp, setIsSigningUp] = useState(false)
   const [isValidating, setIsValidating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [tokenError, setTokenError] = useState<string | null>(null)
   const chatPanelRef = useRef<HTMLElement | null>(null)
   const autoValidatedTokenRef = useRef<string | null>(null)
 
@@ -102,6 +105,7 @@ export default function App() {
       return
     }
     setError(null)
+    setTokenError(null)
     setIsValidating(true)
     try {
       await validateToken(trimmedToken)
@@ -110,7 +114,7 @@ export default function App() {
       setIsTokenCollapsed(true)
     } catch (err) {
       setIsValidated(false)
-      setError(err instanceof Error ? err.message : 'Unknown token validation error')
+      setTokenError(err instanceof Error ? err.message : 'Unknown token validation error')
     } finally {
       setIsValidating(false)
     }
@@ -142,22 +146,41 @@ export default function App() {
       id: assistantId,
       role: 'assistant',
       text: '',
-      latestCtxTimeMs: null,
-      questionMode: null,
-      queriedViews: [],
     }
 
     setMessages((prev) => [...prev, userMessage, assistantMessage])
+    setSqlStatements([])
+    setIsSqlCollapsed(true)
+    setLlmTimingEvents([])
     setInput('')
 
     try {
-      const result = await streamChat(text, token.trim(), (delta) => {
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === assistantId ? { ...message, text: `${message.text}${delta}` } : message,
-          ),
-        )
-      })
+      const result = await streamChat(
+        text,
+        token.trim(),
+        (delta) => {
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantId ? { ...message, text: `${message.text}${delta}` } : message,
+            ),
+          )
+        },
+        (statement) => {
+          setSqlStatements((prev) => [...prev, statement])
+        },
+        () => {},
+        (timing) => {
+          setLlmTimingEvents((prev) => [...prev, timing])
+        },
+        () => {
+          // reset: clear any partially streamed answer before a new candidate
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantId ? { ...message, text: '' } : message,
+            ),
+          )
+        },
+      )
 
       setMessages((prev) =>
         prev.map((message) =>
@@ -165,14 +188,25 @@ export default function App() {
             ? {
                 ...message,
                 text: result.text || message.text,
-                latestCtxTimeMs: result.latestCtxTimeMs,
-                questionMode: result.questionMode,
-                queriedViews: result.queriedViews,
               }
             : message,
         ),
       )
     } catch (err) {
+      if (err instanceof PartialStreamError) {
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === assistantId
+              ? {
+                  ...message,
+                  text: err.partialText || message.text,
+                }
+              : message,
+          ),
+        )
+        setError(`Response stream interrupted. Showing partial response. ${err.message}`)
+        return
+      }
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setIsStreaming(false)
@@ -302,7 +336,7 @@ export default function App() {
               <div className="auth-title">Access token</div>
               <span className="status-badge">Validated</span>
             </div>
-            <div className="hint">Token {maskedToken} validated for Anthropic and DeltaStream MCP.</div>
+            <div className="hint">Token {maskedToken} validated for the model provider and DeltaStream MCP.</div>
             <button type="button" className="link-button" onClick={() => setIsTokenCollapsed(false)}>
               Edit token
             </button>
@@ -312,6 +346,7 @@ export default function App() {
             <div className="card-kicker">Access setup</div>
             <h3>Validate your token</h3>
             <p className="auth-copy">Paste the access token from your confirmation email before starting chat.</p>
+            {tokenError ? <div className="error form-error">Error: {tokenError}</div> : null}
             <label htmlFor="api-token">Access token</label>
             <div className="inline-form">
               <input
@@ -320,6 +355,7 @@ export default function App() {
                 onChange={(event) => {
                   setToken(event.target.value)
                   setIsValidated(false)
+                  setTokenError(null)
                 }}
                 placeholder="Paste token from your confirmation email"
                 disabled={isValidating}
@@ -330,7 +366,7 @@ export default function App() {
             </div>
             <div className="hint">
               {isValidated
-                ? 'Token validated for Anthropic and DeltaStream MCP.'
+                ? 'Token validated for the model provider and DeltaStream MCP.'
                 : 'Validate token before starting chat.'}
             </div>
           </form>
@@ -365,6 +401,69 @@ export default function App() {
           </div>
         </section>
 
+        <section className="auth-context-card">
+          <div className="feature-kicker">DeltaStream SQL</div>
+          <div className="section-header-row">
+            <h2>Executed during this request</h2>
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => setIsSqlCollapsed((current) => !current)}
+            >
+              {isSqlCollapsed ? 'Expand' : 'Collapse'}
+            </button>
+          </div>
+          {isSqlCollapsed ? (
+            <p className="auth-copy">
+              {sqlStatements.length === 0
+                ? 'SQL statements executed through the DeltaStream MCP toolset will appear here.'
+                : `${sqlStatements.length} SQL statement${sqlStatements.length === 1 ? '' : 's'} captured for this request.`}
+            </p>
+          ) : sqlStatements.length === 0 ? (
+            <p className="auth-copy">SQL statements executed through the DeltaStream MCP toolset will appear here.</p>
+          ) : (
+            <div className="sql-list">
+              {sqlStatements.map((statement) => (
+                <pre key={statement.id} className="sql-block">
+                  {statement.statement}
+                </pre>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="auth-context-card">
+          <div className="feature-kicker">LLM timing</div>
+          <h2>Model latency during this request</h2>
+          {llmTimingEvents.length === 0 ? (
+            <p className="auth-copy">Attempt and total LLM timing metrics will appear here during each request.</p>
+          ) : (
+            <div className="timing-list">
+              {llmTimingEvents.map((event, index) => (
+                <div key={`${event.kind}-${index}`} className="timing-row">
+                  <div className="timing-label">
+                    {event.kind === 'attempt' ? `Attempt ${event.attempt ?? index + 1}` : 'Total'}
+                  </div>
+                  <div className="timing-value">{(event.durationMs / 1000).toFixed(2)}s</div>
+                  <div className="timing-meta">
+                    {event.kind === 'attempt'
+                      ? event.accepted
+                        ? 'accepted'
+                        : 'retry'
+                      : `${event.attempts ?? 1} attempts`}
+                    {typeof event.outputChars === 'number' ? `, ${event.outputChars} chars` : ''}
+                    {event.kind === 'summary' && typeof event.hadDataQuery === 'boolean'
+                      ? event.hadDataQuery
+                        ? ', data queried'
+                        : ', no data query'
+                      : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         <section className="chat-shell">
           <div className="chat-header-row">
             <div>
@@ -385,12 +484,11 @@ export default function App() {
             {messages.map((message) => (
               <article key={message.id} className={`message ${message.role}`}>
                 <div className="meta">{message.role === 'user' ? 'You' : 'Agent'}</div>
-                <pre>{message.text}</pre>
-                {message.role === 'assistant' && message.latestCtxTimeMs ? (
-                  <div className="freshness">
-                    ctx_time_ms: {message.latestCtxTimeMs} (latest reflected source event timestamp)
-                  </div>
-                ) : null}
+                {message.role === 'assistant' && isStreaming && !message.text ? (
+                  <div className="thinking-state">Thinking...</div>
+                ) : (
+                  <pre>{message.text}</pre>
+                )}
               </article>
             ))}
           </main>
