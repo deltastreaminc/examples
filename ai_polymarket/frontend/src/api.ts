@@ -66,6 +66,7 @@ export async function streamChat(
   onDocSearch: (query: DocSearchQuery) => void,
   onLlmTiming: (timing: LlmTimingEvent) => void,
   onReset?: () => void,
+  conversationId?: string,
 ): Promise<StreamResult> {
   let finalText = ''
   let streamedText = ''
@@ -121,7 +122,7 @@ export async function streamChat(
   const startResponse = await fetch(containerApiUrl('/api/chat/start'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, conversation_id: conversationId }),
   })
   if (!startResponse.ok) {
     const payload = (await startResponse.json().catch(() => ({}))) as Record<string, unknown>

@@ -1,0 +1,4 @@
+kafka-python
+requests
+boto3
+lz4

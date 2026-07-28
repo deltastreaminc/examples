@@ -33,13 +33,13 @@ function DeltaStreamLogo() {
 }
 
 const PROMPTS = [
-  'What is moving right now on Polymarket?',
-  'Give me the top live signals right now.',
-  'Which markets show strong buy pressure?',
-  'Which markets look large-fill-driven?',
-  'Give me the freshest signals instead of the highest score.',
-  'Who is driving activity in this market?',
-  'Show recent fills behind this signal.',
+  'What changed across Polymarket in the last two hours?',
+  'Which of those changes is the most unusual?',
+  'Why does that market stand out?',
+  'Is the activity broad or concentrated?',
+  'Which observed wallets are contributing most?',
+  'Show me the recent fills supporting that explanation.',
+  'Explain all of this like I am 12.',
 ]
 
 const createId = () =>
@@ -64,6 +64,15 @@ export default function App() {
   const [tokenError, setTokenError] = useState<string | null>(null)
   const chatPanelRef = useRef<HTMLElement | null>(null)
   const autoValidatedTokenRef = useRef<string | null>(null)
+  // Auto-scroll control: keep the console pinned to the bottom only while the
+  // user is already there. If they scroll up to read, stop following; if they
+  // scroll back down, resume. Selecting text suppresses auto-scroll entirely.
+  const stickToBottomRef = useRef(true)
+  const isSelectingRef = useRef(false)
+  // Stable per-conversation id so the backend can thread prior turns into the
+  // agent (follow-ups like "that market" resolve against earlier answers).
+  // Regenerated on "Clear chat" to start a fresh conversation.
+  const conversationIdRef = useRef<string>(createId())
 
   const canSend = useMemo(
     () => input.trim().length > 0 && !isStreaming && isValidated,
@@ -148,6 +157,10 @@ export default function App() {
       text: '',
     }
 
+    // Sending a new prompt should always snap to the fresh turn, even if the
+    // user had scrolled up during a previous answer.
+    stickToBottomRef.current = true
+    isSelectingRef.current = false
     setMessages((prev) => [...prev, userMessage, assistantMessage])
     setSqlStatements([])
     setIsSqlCollapsed(true)
@@ -180,6 +193,7 @@ export default function App() {
             ),
           )
         },
+        conversationIdRef.current,
       )
 
       setMessages((prev) =>
@@ -222,17 +236,54 @@ export default function App() {
     if (isStreaming) {
       return
     }
+    // Start a fresh conversation so cleared turns aren't threaded into the agent.
+    conversationIdRef.current = createId()
     setMessages([])
     setInput('')
     setError(null)
   }
+
+  // Distance (px) from the bottom within which we consider the user "pinned"
+  // and keep following new content.
+  const STICK_THRESHOLD_PX = 40
+
+  const onChatScroll = () => {
+    const panel = chatPanelRef.current
+    if (!panel) {
+      return
+    }
+    const distanceFromBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight
+    stickToBottomRef.current = distanceFromBottom <= STICK_THRESHOLD_PX
+  }
+
+  // Suppress auto-scroll while the user has an active text selection inside the
+  // console (so copying mid-stream isn't interrupted, even at the bottom).
+  useEffect(() => {
+    const onSelectionChange = () => {
+      const panel = chatPanelRef.current
+      const selection = globalThis.getSelection?.()
+      if (!panel || !selection || selection.isCollapsed || selection.rangeCount === 0) {
+        isSelectingRef.current = false
+        return
+      }
+      const anchor = selection.anchorNode
+      isSelectingRef.current = anchor != null && panel.contains(anchor)
+    }
+    document.addEventListener('selectionchange', onSelectionChange)
+    return () => document.removeEventListener('selectionchange', onSelectionChange)
+  }, [])
 
   useEffect(() => {
     const panel = chatPanelRef.current
     if (!panel) {
       return
     }
-    panel.scrollTo({ top: panel.scrollHeight, behavior: 'smooth' })
+    if (!stickToBottomRef.current || isSelectingRef.current) {
+      return
+    }
+    // Instant (not smooth) so the viewport tracks streamed tokens without a
+    // compounding animation that fights rapid updates.
+    panel.scrollTo({ top: panel.scrollHeight, behavior: 'auto' })
   }, [messages])
 
   useEffect(() => {
@@ -401,69 +452,6 @@ export default function App() {
           </div>
         </section>
 
-        <section className="auth-context-card">
-          <div className="feature-kicker">DeltaStream SQL</div>
-          <div className="section-header-row">
-            <h2>Executed during this request</h2>
-            <button
-              type="button"
-              className="link-button"
-              onClick={() => setIsSqlCollapsed((current) => !current)}
-            >
-              {isSqlCollapsed ? 'Expand' : 'Collapse'}
-            </button>
-          </div>
-          {isSqlCollapsed ? (
-            <p className="auth-copy">
-              {sqlStatements.length === 0
-                ? 'SQL statements executed through the DeltaStream MCP toolset will appear here.'
-                : `${sqlStatements.length} SQL statement${sqlStatements.length === 1 ? '' : 's'} captured for this request.`}
-            </p>
-          ) : sqlStatements.length === 0 ? (
-            <p className="auth-copy">SQL statements executed through the DeltaStream MCP toolset will appear here.</p>
-          ) : (
-            <div className="sql-list">
-              {sqlStatements.map((statement) => (
-                <pre key={statement.id} className="sql-block">
-                  {statement.statement}
-                </pre>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="auth-context-card">
-          <div className="feature-kicker">LLM timing</div>
-          <h2>Model latency during this request</h2>
-          {llmTimingEvents.length === 0 ? (
-            <p className="auth-copy">Attempt and total LLM timing metrics will appear here during each request.</p>
-          ) : (
-            <div className="timing-list">
-              {llmTimingEvents.map((event, index) => (
-                <div key={`${event.kind}-${index}`} className="timing-row">
-                  <div className="timing-label">
-                    {event.kind === 'attempt' ? `Attempt ${event.attempt ?? index + 1}` : 'Total'}
-                  </div>
-                  <div className="timing-value">{(event.durationMs / 1000).toFixed(2)}s</div>
-                  <div className="timing-meta">
-                    {event.kind === 'attempt'
-                      ? event.accepted
-                        ? 'accepted'
-                        : 'retry'
-                      : `${event.attempts ?? 1} attempts`}
-                    {typeof event.outputChars === 'number' ? `, ${event.outputChars} chars` : ''}
-                    {event.kind === 'summary' && typeof event.hadDataQuery === 'boolean'
-                      ? event.hadDataQuery
-                        ? ', data queried'
-                        : ', no data query'
-                      : ''}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
         <section className="chat-shell">
           <div className="chat-header-row">
             <div>
@@ -473,7 +461,7 @@ export default function App() {
             <div className="chat-header-meta">Streaming answers from DeltaStream context</div>
           </div>
 
-          <main ref={chatPanelRef} className="chat-panel">
+          <main ref={chatPanelRef} className="chat-panel" onScroll={onChatScroll}>
             {messages.length === 0 ? (
               <div className="empty-state">
                 Ask for a live briefing, strongest buy or sell pressure, large-fill-driven markets, or who is

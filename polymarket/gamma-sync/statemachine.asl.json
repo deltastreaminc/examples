@@ -1,0 +1,72 @@
+{
+  "Comment": "Invoke the gamma-sync dispatcher __ITERATIONS__ times per minute, __WAIT_SECONDS__s apart, for a permanent sub-minute cadence.",
+  "StartAt": "ConfigureCount",
+  "States": {
+    "ConfigureCount": {
+      "Type": "Pass",
+      "Parameters": {
+        "index": 0,
+        "count": __ITERATIONS__
+      },
+      "ResultPath": "$.iterator",
+      "Next": "Dispatch"
+    },
+    "Dispatch": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "__DISPATCHER_ARN__"
+      },
+      "ResultPath": "$.dispatchResult",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.TooManyRequestsException",
+            "Lambda.ServiceException",
+            "Lambda.SdkClientException",
+            "Lambda.AWSLambdaException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.dispatchError",
+          "Next": "Increment"
+        }
+      ],
+      "Next": "Increment"
+    },
+    "Increment": {
+      "Type": "Pass",
+      "Parameters": {
+        "index.$": "States.MathAdd($.iterator.index, 1)",
+        "count.$": "$.iterator.count"
+      },
+      "ResultPath": "$.iterator",
+      "Next": "IsCountReached"
+    },
+    "IsCountReached": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.iterator.index",
+          "NumericLessThanPath": "$.iterator.count",
+          "Next": "Wait"
+        }
+      ],
+      "Default": "Done"
+    },
+    "Wait": {
+      "Type": "Wait",
+      "Seconds": __WAIT_SECONDS__,
+      "Next": "Dispatch"
+    },
+    "Done": {
+      "Type": "Succeed"
+    }
+  }
+}

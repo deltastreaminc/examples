@@ -1,6 +1,6 @@
 SHELL := /bin/zsh
 
-IMAGE_NAME ?= public.ecr.aws/i3m5v2n6/deltastreaminc/polymarket-live-signal-radar-demo:latest
+IMAGE_NAME ?= public.ecr.aws/i3m5v2n6/deltastreaminc/polymarket-live-signal-radar-demo:1.0.5
 CONTAINER_NAME ?= polymarket-live-signal-radar
 PLATFORMS ?= linux/amd64,linux/arm64
 LOCAL_PLATFORM ?= linux/arm64

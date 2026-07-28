@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import time
 import uuid
@@ -11,10 +12,32 @@ from typing import Any, AsyncGenerator
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
-from .agent import _bare_model_name, stream_answer
+from .agent import _bare_model_name, messages_from_transcript, stream_answer
 from .http_clients import probe_anthropic, probe_gemini, probe_mcp, signup
 from .schemas import ChatRequest, SignupRequest
 from .settings import settings
+
+logger = logging.getLogger("polymarket.agent")
+# Ensure our per-call LLM usage summary is visible at INFO. Under uvicorn the root
+# logger often has no INFO handler, so records would otherwise be dropped — attach
+# our own stream handler and stop propagation to avoid duplicate lines.
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _log_handler = logging.StreamHandler()
+    _log_handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+    )
+    logger.addHandler(_log_handler)
+logger.propagate = False
+
+# Eye-catcher so you can confirm the running pod is the image you just built.
+# Bump settings.build_marker (or set BUILD_MARKER env) each build to verify rollout.
+logger.info(
+    "========== POLYMARKET AGENT STARTUP build=%s model=%s mcp=%s ==========",
+    settings.build_marker,
+    settings.model_name,
+    settings.deltastream_mcp_url,
+)
 
 
 FRONTEND_DIST_DIR = Path(os.getenv("FRONTEND_DIST_DIR", "frontend/dist"))
@@ -138,6 +161,78 @@ _SSE_HEARTBEAT_SECONDS = max(1.0, settings.sse_heartbeat_seconds)
 _CHAT_JOBS: dict[str, dict[str, Any]] = {}
 _CHAT_JOB_TTL_SECONDS = 600.0
 
+# In-process conversation memory (single replica; documented above). Keyed by a
+# client-supplied conversation_id, each entry holds a plain transcript of
+# (question, answer) pairs plus a last-updated timestamp. Reconstructed into
+# pydantic-ai message history on each turn so follow-ups can resolve references
+# like "that market" against prior answers. Lost on restart — fine for a demo.
+_CONVERSATIONS: dict[str, dict[str, Any]] = {}
+
+
+def _cleanup_conversations() -> None:
+    now = time.monotonic()
+    stale = [
+        conversation_id
+        for conversation_id, entry in _CONVERSATIONS.items()
+        if now - entry["updated"] > settings.conversation_ttl_seconds
+    ]
+    for conversation_id in stale:
+        _CONVERSATIONS.pop(conversation_id, None)
+
+
+def _conversation_history(conversation_id: str | None) -> list[Any] | None:
+    if not conversation_id:
+        return None
+    entry = _CONVERSATIONS.get(conversation_id)
+    if not entry or not entry["transcript"]:
+        return None
+    return messages_from_transcript(entry["transcript"])
+
+
+def _record_conversation_turn(
+    conversation_id: str | None, question: str, answer: str
+) -> None:
+    if not conversation_id or not question or not answer:
+        return
+    entry = _CONVERSATIONS.setdefault(conversation_id, {"transcript": [], "updated": 0.0})
+    entry["transcript"].append((question, answer))
+    # Keep the most recent N messages (each turn = 2 messages: Q + A).
+    max_turns = max(1, settings.conversation_max_messages // 2)
+    if len(entry["transcript"]) > max_turns:
+        entry["transcript"] = entry["transcript"][-max_turns:]
+    entry["updated"] = time.monotonic()
+
+
+def _log_llm_usage(
+    event_type: str,
+    payload: Any,
+    message: str,
+    conversation_id: str | None,
+    source: str,
+) -> None:
+    """Emit one INFO line per user call summarizing LLM request/token usage."""
+    if event_type != "llm_timing" or not isinstance(payload, dict):
+        return
+    if payload.get("kind") != "summary":
+        return
+    preview = (message or "").strip().replace("\n", " ")
+    if len(preview) > 80:
+        preview = preview[:77] + "..."
+    logger.info(
+        "llm call [%s]: model_requests=%d tool_calls=%d attempts=%d "
+        "input_tokens=%d output_tokens=%d duration_ms=%d outcome=%s conversation=%s q=%r",
+        source,
+        payload.get("model_requests", 0),
+        payload.get("tool_calls", 0),
+        payload.get("attempts", 0),
+        payload.get("input_tokens", 0),
+        payload.get("output_tokens", 0),
+        payload.get("duration_ms", 0),
+        payload.get("outcome", "?"),
+        conversation_id or "-",
+        preview,
+    )
+
 
 def _event_to_dict(event_type: str, payload: Any) -> dict[str, Any] | None:
     """Map an internal agent event to a client event {event, data}."""
@@ -167,7 +262,9 @@ def _cleanup_chat_jobs() -> None:
         _CHAT_JOBS.pop(job_id, None)
 
 
-async def _run_chat_job(job_id: str, message: str, token: str) -> None:
+async def _run_chat_job(
+    job_id: str, message: str, token: str, conversation_id: str | None = None
+) -> None:
     job = _CHAT_JOBS[job_id]
 
     def _append(event: dict[str, Any]) -> None:
@@ -183,8 +280,13 @@ async def _run_chat_job(job_id: str, message: str, token: str) -> None:
         job["updated"] = time.monotonic()
         return
 
+    history = _conversation_history(conversation_id)
+    final_text = ""
     try:
-        async for event_type, payload in stream_answer(message, token):
+        async for event_type, payload in stream_answer(message, token, history=history):
+            if event_type == "final" and isinstance(payload, str):
+                final_text = payload
+            _log_llm_usage(event_type, payload, message, conversation_id, "poll")
             event = _event_to_dict(event_type, payload)
             if event is not None:
                 _append(event)
@@ -194,6 +296,7 @@ async def _run_chat_job(job_id: str, message: str, token: str) -> None:
         job["updated"] = time.monotonic()
         return
 
+    _record_conversation_turn(conversation_id, message, final_text)
     _append({"event": "done", "data": {"status": "completed"}})
     job["status"] = "done"
     job["updated"] = time.monotonic()
@@ -263,7 +366,8 @@ async def chat_stream(
 
         async def _produce() -> None:
             try:
-                async for item in stream_answer(request.message, token):
+                history = _conversation_history(request.conversation_id)
+                async for item in stream_answer(request.message, token, history=history):
                     await queue.put(("event", item))
             except Exception as exc:  # noqa: BLE001
                 await queue.put(("error", _friendly_stream_error_message(str(exc))))
@@ -295,6 +399,9 @@ async def chat_stream(
                 elif event_type == "doc_search":
                     yield _sse("doc_search", {"query": payload})
                 elif event_type == "llm_timing":
+                    _log_llm_usage(
+                        event_type, payload, request.message, request.conversation_id, "stream"
+                    )
                     yield _sse("llm_timing", payload)
                 elif event_type == "reset":
                     rendered = ""
@@ -308,6 +415,7 @@ async def chat_stream(
             if not producer.done():
                 producer.cancel()
 
+        _record_conversation_turn(request.conversation_id, request.message, rendered)
         yield _sse("final", {"text": rendered})
         yield _sse("done", {"status": "completed"})
 
@@ -330,6 +438,7 @@ async def chat_start(
     """Start a chat as a background job and return its id for polling."""
     token = _extract_bearer_token(authorization)
     _cleanup_chat_jobs()
+    _cleanup_conversations()
     job_id = uuid.uuid4().hex
     _CHAT_JOBS[job_id] = {
         "events": [],
@@ -337,7 +446,9 @@ async def chat_start(
         "updated": time.monotonic(),
     }
     # Keep a reference to the task so it isn't garbage-collected mid-run.
-    task = asyncio.create_task(_run_chat_job(job_id, request.message, token))
+    task = asyncio.create_task(
+        _run_chat_job(job_id, request.message, token, request.conversation_id)
+    )
     _CHAT_JOBS[job_id]["task"] = task
     return JSONResponse({"job_id": job_id})
 

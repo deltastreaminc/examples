@@ -7,6 +7,10 @@ ROOT_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 
 
 class Settings(BaseSettings):
+    # Build/version marker logged loudly at startup so you can confirm the running
+    # pod is the image you just built. Override per build via env BUILD_MARKER
+    # (e.g. BUILD_MARKER=1.0.2-logging in the Dockerfile/deployment).
+    build_marker: str = "dev-mcp-request-logging"
     # Base URL of the AI demo backend. All demo-hosted endpoints are derived from this.
     ai_demo_backend: str = "https://demo.deltastream.io"
     deltastream_mcp_url: str = "https://api-kap822.deltastream.io/mcp/v2"
@@ -23,6 +27,11 @@ class Settings(BaseSettings):
     root_path: str = ""
     query_limit: int = 250
     primary_query_limit: int = 500
+    # Conversation memory: keep the most recent N transcript messages (user +
+    # assistant) per conversation so follow-up questions ("that market", "all of
+    # this") resolve against prior turns. In-process only (single replica).
+    conversation_max_messages: int = 10
+    conversation_ttl_seconds: float = 1800.0
     quick_mode_enabled: bool = True
     quick_mode_max_attempts: int = 2
     quick_mode_max_tokens: int = 1400
