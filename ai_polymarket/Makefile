@@ -9,6 +9,8 @@ ECR_PUBLIC_REGION ?= us-east-1
 VENV_DIR ?= .venv
 PYTHON ?= $(VENV_DIR)/bin/python
 PIP ?= $(VENV_DIR)/bin/pip
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+BUILD_MARKER ?= $(shell date -u +%Y%m%d-%H%M%S)
 
 .PHONY: install dev run ecr-login buildx-builder build-image build-image-clean build-image-local push-image run-image stop-image health frontend-build backend-check dsql-list
 
@@ -34,13 +36,13 @@ ecr-login:
 	aws ecr-public get-login-password --region $${ECR_PUBLIC_REGION:-$(ECR_PUBLIC_REGION)} | docker login --username AWS --password-stdin public.ecr.aws
 
 build-image: ecr-login buildx-builder
-	docker buildx build --builder $${BUILDER_NAME:-$(BUILDER_NAME)} --platform $${PLATFORMS:-$(PLATFORMS)} -f backend/Dockerfile -t $${IMAGE_NAME:-$(IMAGE_NAME)} --push .
+	docker buildx build --builder $${BUILDER_NAME:-$(BUILDER_NAME)} --platform $${PLATFORMS:-$(PLATFORMS)} --build-arg BUILD_DATE="$${BUILD_DATE:-$(BUILD_DATE)}" --build-arg BUILD_MARKER="$${BUILD_MARKER:-$(BUILD_MARKER)}" -f backend/Dockerfile -t $${IMAGE_NAME:-$(IMAGE_NAME)} --push .
 
 build-image-clean: ecr-login buildx-builder
-	docker buildx build --no-cache --builder $${BUILDER_NAME:-$(BUILDER_NAME)} --platform $${PLATFORMS:-$(PLATFORMS)} -f backend/Dockerfile -t $${IMAGE_NAME:-$(IMAGE_NAME)} --push .
+	docker buildx build --no-cache --builder $${BUILDER_NAME:-$(BUILDER_NAME)} --platform $${PLATFORMS:-$(PLATFORMS)} --build-arg BUILD_DATE="$${BUILD_DATE:-$(BUILD_DATE)}" --build-arg BUILD_MARKER="$${BUILD_MARKER:-$(BUILD_MARKER)}" -f backend/Dockerfile -t $${IMAGE_NAME:-$(IMAGE_NAME)} --push .
 
 build-image-local: buildx-builder
-	docker buildx build --builder $${BUILDER_NAME:-$(BUILDER_NAME)} --platform $${LOCAL_PLATFORM:-$(LOCAL_PLATFORM)} -f backend/Dockerfile -t $${IMAGE_NAME:-$(IMAGE_NAME)} --load .
+	docker buildx build --builder $${BUILDER_NAME:-$(BUILDER_NAME)} --platform $${LOCAL_PLATFORM:-$(LOCAL_PLATFORM)} --build-arg BUILD_DATE="$${BUILD_DATE:-$(BUILD_DATE)}" --build-arg BUILD_MARKER="$${BUILD_MARKER:-$(BUILD_MARKER)}" -f backend/Dockerfile -t $${IMAGE_NAME:-$(IMAGE_NAME)} --load .
 
 push-image:
 	@printf 'Multi-arch images are pushed during make build-image\n'

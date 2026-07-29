@@ -3,6 +3,15 @@ import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from '
 import { PartialStreamError, signup, streamChat, validateToken } from './api'
 import type { ChatMessage, LlmTimingEvent, SqlStatement } from './types'
 
+declare global {
+  interface Window {
+    __BUILD_INFO__?: {
+      buildDate?: string
+      buildMarker?: string
+    }
+  }
+}
+
 function DeltaStreamLogo() {
   return (
     <svg
@@ -51,6 +60,8 @@ const formatDuration = (durationMs: number) => {
   }
   return `${Math.round(durationMs)}ms`
 }
+
+const buildInfo = globalThis.window?.__BUILD_INFO__
 
 export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -340,6 +351,13 @@ export default function App() {
           <span>Polymarket</span>
           <strong>Signal Radar</strong>
         </div>
+        {buildInfo?.buildDate || buildInfo?.buildMarker ? (
+          <div className="build-badge" aria-label="Running image build info">
+            <span>Running build</span>
+            <strong>{buildInfo.buildMarker || 'unknown'}</strong>
+            {buildInfo.buildDate ? <em>{buildInfo.buildDate}</em> : null}
+          </div>
+        ) : null}
         <div className="topbar-status">
           <span className={isValidated ? 'status-dot online' : 'status-dot'} />
           {isValidated ? 'Demo access active' : 'Validate access to chat'}

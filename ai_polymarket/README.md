@@ -169,6 +169,19 @@ If answers get cut off, raise `GEMINI_MAX_OUTPUT_TOKENS`. If requests time out, 
 - `make backend-check` - compile backend Python files
 - `make dsql-list` - print ordered SQL files
 
+## Image security
+
+The container uses a multi-stage build and pins the Python runtime to
+`python:3.12-slim-bookworm`. This avoids inheriting newer slim image OS packages that have
+unfixed high/critical scanner findings in `perl-base`, `util-linux`, `ncurses`, `gzip`, and
+related base utilities. The runtime stage also applies available Debian security updates,
+removes package-manager state, copies only the built frontend plus Python virtualenv, and runs
+the FastAPI process as an unprivileged `app` user.
+
+If a scanner still reports high/critical OS CVEs with no fixed version, treat them as upstream
+base-image findings: rebuild when the distro publishes fixes, and document that the app does not
+invoke the affected shell utilities during normal operation.
+
 ## Run locally in Docker
 
 The image works at any mount path — the serving base path is chosen at runtime from

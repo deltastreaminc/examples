@@ -33,8 +33,9 @@ logger.propagate = False
 # Eye-catcher so you can confirm the running pod is the image you just built.
 # Bump settings.build_marker (or set BUILD_MARKER env) each build to verify rollout.
 logger.info(
-    "========== POLYMARKET AGENT STARTUP build=%s model=%s mcp=%s ==========",
+    "========== POLYMARKET AGENT STARTUP build=%s date=%s model=%s mcp=%s ==========",
     settings.build_marker,
+    settings.build_date,
     settings.model_name,
     settings.deltastream_mcp_url,
 )
@@ -67,6 +68,7 @@ def _render_index() -> HTMLResponse | JSONResponse:
     injection = (
         f'<base href="{_APP_BASE}">'
         f'<script>window.__APP_BASE__={json.dumps(_APP_BASE)};</script>'
+        f'<script>window.__BUILD_INFO__={json.dumps({"buildDate": settings.build_date, "buildMarker": settings.build_marker})};</script>'
     )
     # Insert immediately after <head> so it precedes Vite's asset tags.
     if "<head>" in html:
@@ -312,7 +314,13 @@ _inner = FastAPI(title="Polymarket Live Signal Radar", version="0.1.0")
 
 @_inner.get("/api/health")
 async def health() -> JSONResponse:
-    return JSONResponse({"ok": True})
+    return JSONResponse(
+        {
+            "ok": True,
+            "build_marker": settings.build_marker,
+            "build_date": settings.build_date,
+        }
+    )
 
 
 @_inner.post("/api/signup")
