@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 
 import { PartialStreamError, signup, streamChat, validateToken } from './api'
 import type { ChatMessage, LlmTimingEvent, SqlStatement } from './types'
@@ -44,6 +44,13 @@ const PROMPTS = [
 
 const createId = () =>
   globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+const formatDuration = (durationMs: number) => {
+  if (durationMs >= 1000) {
+    return `${(durationMs / 1000).toFixed(1)}s`
+  }
+  return `${Math.round(durationMs)}ms`
+}
 
 export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -232,6 +239,16 @@ export default function App() {
     await sendMessage(input)
   }
 
+  const onInputKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey) {
+      return
+    }
+    event.preventDefault()
+    if (canSend) {
+      void sendMessage(input)
+    }
+  }
+
   const onClearChat = () => {
     if (isStreaming) {
       return
@@ -311,195 +328,249 @@ export default function App() {
     void runTokenValidation(accessToken)
   }, [isValidated, isValidating, token])
 
+  const latestTiming = llmTimingEvents[llmTimingEvents.length - 1]
+
   return (
     <div className="page-shell">
       <header className="topbar">
         <a className="brand-mark" href="https://www.deltastream.io/" target="_blank" rel="noreferrer">
           <DeltaStreamLogo />
-          <div>
-            <div className="brand-name">DeltaStream</div>
-            <div className="brand-subtitle">The Real-Time Context Engine for Agents</div>
-          </div>
         </a>
+        <div className="product-mark" aria-label="Product name">
+          <span>Polymarket</span>
+          <strong>Signal Radar</strong>
+        </div>
+        <div className="topbar-status">
+          <span className={isValidated ? 'status-dot online' : 'status-dot'} />
+          {isValidated ? 'Demo access active' : 'Validate access to chat'}
+        </div>
       </header>
 
       <main className="app-shell">
-        <section className="hero-panel demo-panel">
+        <section className="hero-panel">
           <div className="hero-copy">
-            <div className="eyebrow">Polymarket Live Signal Radar Demo</div>
-            <h1>Explain what is moving on Polymarket right now.</h1>
+            <div className="eyebrow">/ Polymarket intelligence console /</div>
+            <h1>Track live Polymarket moves before they get noisy.</h1>
             <p className="hero-lede">
-              This demo uses DeltaStream-precomputed context from Goldsky Polymarket streams and Gamma market
-              metadata. Answers stay grounded in fresh context, and freshness is anchored to <code>ctx_time_ms</code>.
+              Ask for fresh movers, unusual wallet activity, buy or sell pressure, and the fills behind a signal. The
+              radar keeps every answer tied to the latest reflected market context.
             </p>
+            <div className="powered-by">Powered by DeltaStream real-time context</div>
           </div>
-          <div className="hero-sidecar compact-sidecar">
-            <article className="signal-card signal-card-primary">
-              <div className="signal-label">Broad briefing</div>
-              <div className="signal-title">Top live signals</div>
-              <p>Broad summaries, buy or sell pressure, activity, ranking, and large-fill-driven signals.</p>
-            </article>
-            <article className="signal-card">
-              <div className="signal-label">Drill-down</div>
-              <div className="signal-title">Drivers and evidence</div>
-              <p>Used for driver analysis, raw fill evidence, and clearer market context when you ask for it.</p>
-            </article>
+          <div className="hero-sidecar" aria-label="Demo data path">
+            <div className="flow-step">Trades</div>
+            <div className="flow-line" />
+            <div className="flow-step flow-step-strong">Signal radar</div>
+            <div className="flow-line" />
+            <div className="flow-step">Briefing</div>
           </div>
         </section>
 
-        <section className="auth-grid">
-          {isSignupCollapsed ? (
-            <section className="signup-form auth-collapsed">
-              <div className="card-kicker">Access setup</div>
-              <div className="auth-title">Signup email</div>
-              <div className="hint">Submitted as {email.trim()}.</div>
-              {signupMessage ? <div className="hint">{signupMessage}</div> : null}
-            <button type="button" className="link-button" onClick={() => setIsSignupCollapsed(false)}>
-              Edit email
-            </button>
-          </section>
-        ) : (
-          <form className="signup-form" onSubmit={onSignup}>
-            <div className="card-kicker">Access setup</div>
-            <h3>Request demo access</h3>
-            <p className="auth-copy">Enter your email to receive the demo signup and access instructions.</p>
-            <label htmlFor="signup-email">Signup email</label>
-            <div className="inline-form">
-              <input
-                id="signup-email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                disabled={isSigningUp}
-              />
-              <button type="submit" disabled={!canSignup}>
-                {isSigningUp ? 'Submitting...' : 'Sign up'}
-              </button>
-            </div>
-            {signupMessage ? <div className="hint">{signupMessage}</div> : null}
-          </form>
-        )}
+        <section className="workspace-grid">
+          <aside className="side-rail" aria-label="Demo setup and context">
+            <section className="rail-card setup-card">
+              <div className="card-kicker">/ access setup /</div>
+              {isSignupCollapsed ? (
+                <div className="auth-collapsed">
+                  <div className="auth-title-row">
+                    <div>
+                      <div className="auth-title">Signup email</div>
+                      <div className="auth-value">{email.trim() || 'Email submitted'}</div>
+                    </div>
+                    <span className="status-badge">Sent</span>
+                  </div>
+                  {signupMessage ? <div className="hint">{signupMessage}</div> : null}
+                  <button type="button" className="link-button" onClick={() => setIsSignupCollapsed(false)}>
+                    Edit email
+                  </button>
+                </div>
+              ) : (
+                <form className="stack-form" onSubmit={onSignup}>
+                  <h3>Request demo access</h3>
+                  <p className="auth-copy">Enter your email to receive signup and token instructions.</p>
+                  <label htmlFor="signup-email">Signup email</label>
+                  <input
+                    id="signup-email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    disabled={isSigningUp}
+                  />
+                  <button type="submit" disabled={!canSignup}>
+                    {isSigningUp ? 'Submitting...' : 'Sign up'}
+                  </button>
+                  {signupMessage ? <div className="hint">{signupMessage}</div> : null}
+                </form>
+              )}
 
-        {isTokenCollapsed ? (
-          <section className="token-form auth-collapsed">
-            <div className="card-kicker">Access setup</div>
-            <div className="auth-title-row">
-              <div className="auth-title">Access token</div>
-              <span className="status-badge">Validated</span>
-            </div>
-            <div className="hint">Token {maskedToken} validated for the model provider and DeltaStream MCP.</div>
-            <button type="button" className="link-button" onClick={() => setIsTokenCollapsed(false)}>
-              Edit token
-            </button>
-          </section>
-        ) : (
-          <form className="token-form" onSubmit={onValidateToken}>
-            <div className="card-kicker">Access setup</div>
-            <h3>Validate your token</h3>
-            <p className="auth-copy">Paste the access token from your confirmation email before starting chat.</p>
-            {tokenError ? <div className="error form-error">Error: {tokenError}</div> : null}
-            <label htmlFor="api-token">Access token</label>
-            <div className="inline-form">
-              <input
-                id="api-token"
-                value={token}
-                onChange={(event) => {
-                  setToken(event.target.value)
-                  setIsValidated(false)
-                  setTokenError(null)
-                }}
-                placeholder="Paste token from your confirmation email"
-                disabled={isValidating}
-              />
-              <button type="submit" disabled={!canValidate}>
-                {isValidating ? 'Checking...' : 'Validate token'}
-              </button>
-            </div>
-            <div className="hint">
-              {isValidated
-                ? 'Token validated for the model provider and DeltaStream MCP.'
-                : 'Validate token before starting chat.'}
-            </div>
-          </form>
-        )}
-        </section>
+              {isTokenCollapsed ? (
+                <div className="auth-collapsed token-summary">
+                  <div className="auth-title-row">
+                    <div>
+                      <div className="auth-title">Access token</div>
+                      <div className="auth-value">{maskedToken}</div>
+                    </div>
+                    <span className="status-badge">Validated</span>
+                  </div>
+                  <div className="hint">Token validated for the model provider and live market context.</div>
+                  <button type="button" className="link-button" onClick={() => setIsTokenCollapsed(false)}>
+                    Edit token
+                  </button>
+                </div>
+              ) : (
+                <form className="stack-form token-stack" onSubmit={onValidateToken}>
+                  <h3>Validate token</h3>
+                  <p className="auth-copy">Paste the access token before starting chat.</p>
+                  {tokenError ? <div className="error form-error">Error: {tokenError}</div> : null}
+                  <label htmlFor="api-token">Access token</label>
+                  <input
+                    id="api-token"
+                    value={token}
+                    onChange={(event) => {
+                      setToken(event.target.value)
+                      setIsValidated(false)
+                      setTokenError(null)
+                    }}
+                    placeholder="Paste token"
+                    disabled={isValidating}
+                  />
+                  <button type="submit" disabled={!canValidate}>
+                    {isValidating ? 'Checking...' : 'Validate token'}
+                  </button>
+                  <div className="hint">
+                    {isValidated ? 'Ready to ask live questions.' : 'Validation unlocks the chat console.'}
+                  </div>
+                </form>
+              )}
+            </section>
 
-        <section className="auth-context-card">
-          <div className="feature-kicker">Runtime behavior</div>
-          <h2>How the demo answers</h2>
-          <p>
-            The app fetches only the prepared context needed for the current question. It does not scan raw
-            streaming events at chat time, and it keeps answers tied to the latest reflected event time.
-          </p>
-          <ul className="context-list">
-            <li>Broad briefings focus on the strongest current signals</li>
-            <li>Driver questions narrow into who is behind a move</li>
-            <li>Evidence questions show recent raw examples when needed</li>
-          </ul>
-        </section>
-
-        <section className="prompt-panel">
-          <div>
-            <div className="feature-kicker">Prompt starters</div>
-            <h2>Try a few common demo questions.</h2>
-          </div>
-          <div className="prompt-strip" aria-label="Demo prompts">
-            {PROMPTS.map((prompt) => (
-              <button key={prompt} onClick={() => void sendMessage(prompt)} disabled={isStreaming || !isValidated}>
-                {prompt}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="chat-shell">
-          <div className="chat-header-row">
-            <div>
-              <div className="feature-kicker">Chat</div>
-              <h2>Live briefing console</h2>
-            </div>
-            <div className="chat-header-meta">Streaming answers from DeltaStream context</div>
-          </div>
-
-          <main ref={chatPanelRef} className="chat-panel" onScroll={onChatScroll}>
-            {messages.length === 0 ? (
-              <div className="empty-state">
-                Ask for a live briefing, strongest buy or sell pressure, large-fill-driven markets, or who is
-                driving activity in a specific market.
+            <section className="rail-card context-card">
+              <div className="card-kicker">/ market coverage /</div>
+              <h2>Built for live market explainability</h2>
+              <p>
+                The radar turns Polymarket fills, wallet movement, and market metadata into concise explanations you
+                can drill into during a demo.
+              </p>
+              <div className="context-list">
+                <div>Top moving markets</div>
+                <div>Wallet concentration</div>
+                <div>Recent fill evidence</div>
               </div>
-            ) : null}
+            </section>
 
-            {messages.map((message) => (
-              <article key={message.id} className={`message ${message.role}`}>
-                <div className="meta">{message.role === 'user' ? 'You' : 'Agent'}</div>
-                {message.role === 'assistant' && isStreaming && !message.text ? (
-                  <div className="thinking-state">Thinking...</div>
-                ) : (
-                  <pre>{message.text}</pre>
-                )}
-              </article>
-            ))}
-          </main>
+            <section className="rail-card activity-card">
+              <button
+                type="button"
+                className="activity-toggle"
+                onClick={() => setIsSqlCollapsed((current) => !current)}
+                aria-expanded={!isSqlCollapsed}
+              >
+                <span>
+                  <span className="card-kicker">/ evidence trail /</span>
+                  <strong>{sqlStatements.length} context quer{sqlStatements.length === 1 ? 'y' : 'ies'}</strong>
+                </span>
+                <span>{isSqlCollapsed ? 'Show' : 'Hide'}</span>
+              </button>
+              <div className="activity-metrics">
+                <div>
+                  <span>LLM events</span>
+                  <strong>{llmTimingEvents.length}</strong>
+                </div>
+                <div>
+                  <span>Latest</span>
+                  <strong>{latestTiming ? formatDuration(latestTiming.durationMs) : '-'}</strong>
+                </div>
+              </div>
+              {!isSqlCollapsed ? (
+                <div className="activity-log">
+                  {sqlStatements.length === 0 && llmTimingEvents.length === 0 ? (
+                    <div className="hint">Context and timing details appear here after a response starts.</div>
+                  ) : null}
+                  {llmTimingEvents.slice(-3).map((timing, index) => (
+                    <div key={`${timing.kind}-${timing.durationMs}-${index}`} className="timing-row">
+                      <span>{timing.kind === 'attempt' ? `Attempt ${timing.attempt ?? index + 1}` : 'Summary'}</span>
+                      <strong>{formatDuration(timing.durationMs)}</strong>
+                    </div>
+                  ))}
+                  {sqlStatements.slice(-2).map((statement, index) => (
+                    <pre key={statement.id} className="sql-block">
+                      {`Query ${sqlStatements.length - Math.min(sqlStatements.length, 2) + index + 1}\n${statement.statement}`}
+                    </pre>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          </aside>
 
-          <form className="chat-input" onSubmit={onSubmit}>
-            <input
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="Ask what is moving on Polymarket right now..."
-              disabled={isStreaming || !isValidated}
-            />
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={onClearChat}
-              disabled={isStreaming || messages.length === 0}
-            >
-              Clear chat
-            </button>
-            <button type="submit" disabled={!canSend}>
-              {isStreaming ? 'Streaming...' : 'Send'}
-            </button>
-          </form>
+          <section className="chat-shell">
+            <div className="chat-header-row">
+              <div>
+                <div className="feature-kicker">/ chat /</div>
+                <h2>Market briefing console</h2>
+              </div>
+              <div className="chat-header-meta">
+                {isValidated ? 'Streaming Polymarket signals and evidence' : 'Validate your token to begin'}
+              </div>
+            </div>
+
+            <main ref={chatPanelRef} className="chat-panel" onScroll={onChatScroll}>
+              {messages.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-kicker">Live market radar</div>
+                  <h3>Start with what changed.</h3>
+                  <p>
+                    Ask for movers, unusual shifts, concentrated wallet activity, or the trade evidence behind a signal.
+                  </p>
+                  <div className="prompt-grid" aria-label="Demo prompts">
+                    {PROMPTS.slice(0, 4).map((prompt) => (
+                      <button key={prompt} onClick={() => void sendMessage(prompt)} disabled={isStreaming || !isValidated}>
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {messages.map((message) => (
+                <article key={message.id} className={`message ${message.role}`}>
+                  <div className="meta">{message.role === 'user' ? 'You' : 'Signal Radar'}</div>
+                  {message.role === 'assistant' && isStreaming && !message.text ? (
+                    <div className="thinking-state">Reading live market context...</div>
+                  ) : (
+                    <pre>{message.text}</pre>
+                  )}
+                </article>
+              ))}
+            </main>
+
+            <form className="chat-input" onSubmit={onSubmit}>
+              <textarea
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={onInputKeyDown}
+                placeholder={
+                  isValidated
+                    ? 'Ask what is moving on Polymarket right now...'
+                    : 'Validate access first, then ask a market question.'
+                }
+                disabled={isStreaming || !isValidated}
+                rows={2}
+              />
+              <div className="composer-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={onClearChat}
+                  disabled={isStreaming || messages.length === 0}
+                >
+                  Clear
+                </button>
+                <button type="submit" disabled={!canSend}>
+                  {isStreaming ? 'Streaming...' : 'Send'}
+                </button>
+              </div>
+            </form>
+          </section>
         </section>
 
         {error ? <div className="error">Error: {error}</div> : null}

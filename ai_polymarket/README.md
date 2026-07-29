@@ -185,7 +185,7 @@ Then open <http://localhost:8000/> and paste your DeltaStream access token in th
 Notes:
 
 - Your machine must be able to reach `demo.deltastream.io` (Gemini/Anthropic gateway + signup)
-  and `api-kap822.deltastream.io` (MCP) — both resolve over public DNS.
+  and `api-kd8j38.stage.deltastream-internal.name` (MCP).
 - No API key is required; the DeltaStream access token you paste in the UI drives everything.
 - The image defaults to Gemini (`google:gemini-3.5-flash`). To use Anthropic instead, override
   the provider at run time: `-e MODEL_NAME=anthropic:claude-sonnet-4-6`.

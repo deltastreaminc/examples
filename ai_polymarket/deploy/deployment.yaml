@@ -44,9 +44,6 @@ spec:
         - ip: "44.241.201.142"      # demo.deltastream.io (us-west-2 ingress)
           hostnames:
             - "demo.deltastream.io"
-        - ip: "3.132.246.191"        # api-kap822.deltastream.io (us-east-2 ingress)
-          hostnames:
-            - "api-kap822.deltastream.io"
       containers:
         - name: app
           image: public.ecr.aws/i3m5v2n6/deltastreaminc/polymarket-live-signal-radar-demo:latest
@@ -64,7 +61,7 @@ spec:
             - name: AI_DEMO_BACKEND
               value: "https://demo.deltastream.io"
             - name: DELTASTREAM_MCP_URL
-              value: "https://api-kap822.deltastream.io/mcp/v2"
+              value: "https://api-kd8j38.stage.deltastream-internal.name/mcp/v2"
             # Optional tuning (see .env.example for the full list).
             - name: GEMINI_THINKING_LEVEL
               value: "low"

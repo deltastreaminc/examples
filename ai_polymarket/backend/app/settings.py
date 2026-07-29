@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     build_marker: str = "dev-mcp-request-logging"
     # Base URL of the AI demo backend. All demo-hosted endpoints are derived from this.
     ai_demo_backend: str = "https://demo.deltastream.io"
-    deltastream_mcp_url: str = "https://api-kap822.deltastream.io/mcp/v2"
+    deltastream_mcp_url: str = "https://api-kd8j38.stage.deltastream-internal.name/mcp/v2"
     anthropic_api_key: str | None = None
     insecure_demo_tls: bool = False
 
