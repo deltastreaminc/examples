@@ -8,6 +8,7 @@ export interface ChatMessage {
 
 export interface StreamResult {
   text: string
+  followUps: string[]
 }
 
 export interface SqlStatement {

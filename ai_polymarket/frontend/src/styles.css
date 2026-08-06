@@ -486,6 +486,46 @@ pre {
   font-weight: 800;
 }
 
+.followup-card,
+.followup-inline {
+  display: grid;
+  gap: 12px;
+}
+
+.followup-list {
+  display: grid;
+  gap: 10px;
+}
+
+.followup-chip {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--ink);
+  padding: 11px 13px;
+  text-align: left;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.followup-chip:hover:not(:disabled) {
+  border-color: var(--blue);
+  background: rgba(12, 71, 220, 0.06);
+}
+
+.followup-chip:disabled {
+  opacity: 0.5;
+}
+
+.followup-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 .activity-card {
   display: grid;
   gap: 12px;
@@ -656,6 +696,13 @@ pre {
 .message {
   width: min(82%, 780px);
   padding: 14px 16px;
+}
+
+.followup-inline {
+  width: min(82%, 780px);
+  padding: 14px 16px;
+  border: 1px dashed var(--line-strong);
+  background: rgba(240, 243, 255, 0.68);
 }
 
 .message.user {

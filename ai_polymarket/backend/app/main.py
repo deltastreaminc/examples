@@ -250,6 +250,8 @@ def _event_to_dict(event_type: str, payload: Any) -> dict[str, Any] | None:
         return {"event": "token", "data": {"text": payload}}
     if event_type == "final":
         return {"event": "final", "data": {"text": payload}}
+    if event_type == "follow_ups" and isinstance(payload, dict):
+        return {"event": "follow_ups", "data": payload}
     return None
 
 
@@ -419,12 +421,14 @@ async def chat_stream(
                     yield _sse("token", {"text": payload})
                 elif event_type == "final":
                     rendered = payload
+                    yield _sse("final", {"text": payload})
+                elif event_type == "follow_ups" and isinstance(payload, dict):
+                    yield _sse("follow_ups", payload)
         finally:
             if not producer.done():
                 producer.cancel()
 
         _record_conversation_turn(request.conversation_id, request.message, rendered)
-        yield _sse("final", {"text": rendered})
         yield _sse("done", {"status": "completed"})
 
     return StreamingResponse(

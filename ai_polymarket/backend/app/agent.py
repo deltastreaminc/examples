@@ -417,6 +417,46 @@ TRANSITIONAL_LEADING_PATTERNS = [
 TRANSITIONAL_MAX_STUB_CHARS = 280
 
 MAX_RESPONSE_CHARS = 4500
+MIN_FOLLOW_UP_QUESTIONS = 2
+MAX_FOLLOW_UP_QUESTIONS = 3
+MAX_FOLLOW_UP_QUESTION_CHARS = 140
+
+FOLLOW_UP_SYSTEM_PROMPT = """You generate short follow-up questions for a Polymarket analysis UI.
+
+Return only questions the user can click next to drill deeper into the specific market activity
+that was just explained. Keep them grounded in the answer and any referenced SQL queries.
+
+Rules:
+- Return 2 to 3 questions, one per line.
+- Each line must be a direct user question with no numbering, bullets, or commentary.
+- Never include draft labels, section labels, notes, or parenthetical planning text like "Draft 1",
+  "Option B", "Focus", "Angle", or "Takeaway".
+- Questions must drill down into the answer that was just given, not broaden into a new topic.
+- Keep each question under 140 characters.
+- Avoid duplicates and near-duplicates.
+- Avoid generic filler like "tell me more" or "what else stands out".
+- Do not give betting, trading, or investment advice.
+"""
+
+FOLLOW_UP_ALLOWED_PREFIXES = (
+    "what",
+    "which",
+    "where",
+    "who",
+    "how",
+    "is",
+    "are",
+    "do",
+    "does",
+    "did",
+    "can",
+    "could",
+    "would",
+    "show",
+    "explain",
+    "compare",
+    "break down",
+)
 
 
 def messages_from_transcript(
@@ -513,6 +553,216 @@ def _normalize_answer_style(text: str) -> str:
             if blank_run <= 1:
                 normalized_lines.append(line)
     return "\n".join(normalized_lines).strip()
+
+
+def _normalize_follow_up_question(text: str) -> str:
+    cleaned = text.strip().strip('"').strip("'")
+    cleaned = re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    if not cleaned:
+        return ""
+    lowered = cleaned.lower()
+    blocked_markers = (
+        "draft",
+        "option",
+        "focus",
+        "angle",
+        "takeaway",
+        "note",
+        "version",
+        "idea",
+    )
+    if any(lowered.startswith(marker) for marker in blocked_markers):
+        return ""
+    if not any(lowered.startswith(prefix) for prefix in FOLLOW_UP_ALLOWED_PREFIXES):
+        return ""
+    if not cleaned.endswith("?"):
+        cleaned = f"{cleaned.rstrip('.!')}?"
+    if len(cleaned) > MAX_FOLLOW_UP_QUESTION_CHARS:
+        return ""
+    blocked_prefixes = (
+        "tell me more",
+        "what else",
+        "anything else",
+        "can you elaborate",
+        "do you want",
+    )
+    if any(lowered.startswith(prefix) for prefix in blocked_prefixes):
+        return ""
+    return cleaned
+
+
+def _parse_follow_up_questions(text: str) -> list[str]:
+    questions: list[str] = []
+    seen: set[str] = set()
+    for raw_line in text.splitlines():
+        question = _normalize_follow_up_question(raw_line)
+        if not question:
+            continue
+        dedupe_key = question.casefold()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        questions.append(question)
+        if len(questions) >= MAX_FOLLOW_UP_QUESTIONS:
+            break
+    if len(questions) < MIN_FOLLOW_UP_QUESTIONS:
+        return []
+    return questions
+
+
+def _should_generate_follow_ups(final_text: str, outcome: str, had_data_query: bool) -> bool:
+    stripped = final_text.lstrip()
+    return (
+        bool(stripped)
+        and outcome == "accepted"
+        and had_data_query
+        and not stripped.startswith("# Context unavailable")
+        and not stripped.startswith("# Model timeout")
+    )
+
+
+def _build_follow_up_prompt(question: str, final_text: str, executed_queries: list[str]) -> str:
+    query_block = "\n\n".join(executed_queries[:3]) if executed_queries else "(none)"
+    payload = {
+        "user_question": question,
+        "assistant_answer": final_text,
+        "executed_queries": query_block,
+        "goal": "Return short follow-up questions the user can click next to drill into the answer.",
+    }
+    return json.dumps(payload, indent=2, sort_keys=True)
+
+
+def _build_follow_up_retry_prompt(
+    question: str,
+    final_text: str,
+    executed_queries: list[str],
+    previous_output: str,
+) -> str:
+    payload = {
+        "retry_instruction": (
+            "Your previous output did not produce at least 2 valid user-facing drill-down questions. "
+            "Return exactly 2 or 3 short questions, one per line, with no draft labels, notes, or commentary."
+        ),
+        "previous_output": previous_output,
+        "original_request": json.loads(_build_follow_up_prompt(question, final_text, executed_queries)),
+    }
+    return json.dumps(payload, indent=2, sort_keys=True)
+
+
+def _fallback_follow_up_questions(
+    question: str,
+    final_text: str,
+    executed_queries: list[str],
+) -> list[str]:
+    del final_text
+    query_text = "\n".join(executed_queries).lower()
+    question_text = question.lower()
+
+    candidates: list[str] = []
+
+    if "pm_signal_transitions_mv" in query_text or "last two hours" in question_text:
+        candidates.extend(
+            [
+                "Which of those changes still looks strongest right now?",
+                "Which market showed the biggest reversal in that set?",
+                "Show the recent fills behind the most unusual change.",
+            ]
+        )
+    if "pm_wallet_asset_flow_mv" in query_text or "pm_wallet_intelligence_mv" in query_text:
+        candidates.extend(
+            [
+                "Which observed wallets are contributing most to that move?",
+                "Is that activity broad or concentrated across wallets?",
+                "Show the recent fills behind the biggest wallet activity.",
+            ]
+        )
+    if "pm_recent_fills_mv" in query_text:
+        candidates.extend(
+            [
+                "Were those fills concentrated in one market or spread across several?",
+                "Which fills were the largest in that activity?",
+                "What market signal do those fills support most clearly?",
+            ]
+        )
+    if "pm_market_outcome_intelligence_mv" in query_text:
+        candidates.extend(
+            [
+                "Which outcome in that market is attracting more activity right now?",
+                "How different is the attention between the two outcomes?",
+                "Which outcome looks more broad versus concentrated?",
+            ]
+        )
+    if "pm_polymarket_intelligence_mv" in query_text or "pm_story_candidates_mv" in query_text:
+        candidates.extend(
+            [
+                "Which market in that answer deserves the closest attention right now?",
+                "Which signal in that set looks strongest versus most fragile?",
+                "Show the evidence behind the most unusual market in that answer.",
+            ]
+        )
+
+    candidates.extend(
+        [
+            "Which market in that answer stands out most right now?",
+            "Is the activity behind that move broad or concentrated?",
+            "Show the recent fills behind the strongest signal in that answer.",
+        ]
+    )
+
+    questions: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        question_candidate = _normalize_follow_up_question(candidate)
+        if not question_candidate:
+            continue
+        dedupe_key = question_candidate.casefold()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        questions.append(question_candidate)
+        if len(questions) >= MAX_FOLLOW_UP_QUESTIONS:
+            break
+    if len(questions) < MIN_FOLLOW_UP_QUESTIONS:
+        return []
+    return questions
+
+
+async def _generate_follow_up_questions(
+    question: str,
+    final_text: str,
+    executed_queries: list[str],
+    api_token: str,
+) -> list[str]:
+    model = _build_model(api_token)
+    agent = Agent(model, system_prompt=FOLLOW_UP_SYSTEM_PROMPT, retries=1)
+
+    if settings.llm_provider == "google":
+        model_settings: ModelSettings | None = GoogleModelSettings(
+            max_tokens=320,
+            timeout=min(20.0, max(5.0, settings.quick_mode_timeout_seconds)),
+            google_thinking_config={"thinking_level": "low", "include_thoughts": False},
+        )
+    else:
+        model_settings = AnthropicModelSettings(max_tokens=320, timeout=20.0)
+
+    prompt = _build_follow_up_prompt(question, final_text, executed_queries)
+    previous_output = ""
+    for attempt in range(2):
+        result = await agent.run(prompt, model_settings=model_settings)
+        output = result.output if isinstance(result.output, str) else ""
+        questions = _parse_follow_up_questions(output)
+        if len(questions) >= MIN_FOLLOW_UP_QUESTIONS:
+            return questions
+        if attempt == 0:
+            previous_output = output
+            prompt = _build_follow_up_retry_prompt(
+                question,
+                final_text,
+                executed_queries,
+                previous_output,
+            )
+    return _fallback_follow_up_questions(question, final_text, executed_queries)
 
 
 def _last_response_finish_reason(messages: list[Any] | None) -> str | None:
@@ -696,11 +946,14 @@ async def stream_answer(
 ) -> AsyncIterator[tuple[str, Any]]:
     tool_call_events: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
     had_data_query = False
+    executed_queries: list[str] = []
 
     def on_tool_call(tool_name: str, tool_payload: str) -> None:
         nonlocal had_data_query
         if tool_name in {"query_mview", "execute_dsql"}:
             had_data_query = True
+            if tool_payload not in executed_queries:
+                executed_queries.append(tool_payload)
         tool_call_events.put_nowait((tool_name, tool_payload))
 
     agent = _build_agent(api_token, tool_call_callback=on_tool_call)
@@ -1026,3 +1279,16 @@ async def stream_answer(
 
     if final_text:
         yield ("final", final_text)
+    if _should_generate_follow_ups(final_text, outcome, had_data_query):
+        try:
+            follow_ups = await _generate_follow_up_questions(
+                question,
+                final_text,
+                executed_queries,
+                api_token,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("follow-up question generation failed: %s", exc)
+        else:
+            if follow_ups:
+                yield ("follow_ups", {"questions": follow_ups})

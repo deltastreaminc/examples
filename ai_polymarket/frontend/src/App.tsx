@@ -43,9 +43,9 @@ function DeltaStreamLogo() {
 
 const PROMPTS = [
   'What changed across Polymarket in the last two hours?',
-  'Which of those changes is the most unusual?',
-  'Why does that market stand out?',
-  'Is the activity broad or concentrated?',
+  'What markets deserve attention right now on Polymarket?',
+  'Which live signals look strongest right now?',
+  'Where is the most unusual activity showing up right now?',
   'Which observed wallets are contributing most?',
   'Show me the recent fills supporting that explanation.',
   'Explain all of this like I am 12.',
@@ -68,6 +68,7 @@ export default function App() {
   const [sqlStatements, setSqlStatements] = useState<SqlStatement[]>([])
   const [isSqlCollapsed, setIsSqlCollapsed] = useState(true)
   const [llmTimingEvents, setLlmTimingEvents] = useState<LlmTimingEvent[]>([])
+  const [followUps, setFollowUps] = useState<string[]>([])
   const [input, setInput] = useState('')
   const [email, setEmail] = useState('')
   const [token, setToken] = useState('')
@@ -106,6 +107,7 @@ export default function App() {
     }
     return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`
   }, [token])
+  const hasMessages = messages.length > 0
 
   const onSignup = async (event: FormEvent) => {
     event.preventDefault()
@@ -183,6 +185,7 @@ export default function App() {
     setSqlStatements([])
     setIsSqlCollapsed(true)
     setLlmTimingEvents([])
+    setFollowUps([])
     setInput('')
 
     try {
@@ -224,7 +227,9 @@ export default function App() {
             : message,
         ),
       )
+      setFollowUps(result.followUps)
     } catch (err) {
+      setFollowUps([])
       if (err instanceof PartialStreamError) {
         setMessages((prev) =>
           prev.map((message) =>
@@ -268,6 +273,7 @@ export default function App() {
     conversationIdRef.current = createId()
     setMessages([])
     setInput('')
+    setFollowUps([])
     setError(null)
   }
 
@@ -340,6 +346,7 @@ export default function App() {
   }, [isValidated, isValidating, token])
 
   const latestTiming = llmTimingEvents[llmTimingEvents.length - 1]
+  const latestAssistantMessage = [...messages].reverse().find((message) => message.role === 'assistant')
 
   return (
     <div className="page-shell">
@@ -532,7 +539,7 @@ export default function App() {
             </div>
 
             <main ref={chatPanelRef} className="chat-panel" onScroll={onChatScroll}>
-              {messages.length === 0 ? (
+              {!hasMessages ? (
                 <div className="empty-state">
                   <div className="empty-kicker">Live market radar</div>
                   <h3>Start with what changed.</h3>
@@ -559,6 +566,29 @@ export default function App() {
                   )}
                 </article>
               ))}
+
+              {hasMessages && (isStreaming || followUps.length > 0) ? (
+                <section className="followup-inline" aria-label="Drill deeper follow-up questions">
+                  <div className="meta">Drill deeper</div>
+                  {isStreaming ? (
+                    <div className="followup-status">Preparing drill-down questions...</div>
+                  ) : latestAssistantMessage ? (
+                    <div className="followup-list">
+                      {followUps.map((prompt) => (
+                        <button
+                          key={prompt}
+                          type="button"
+                          className="followup-chip"
+                          onClick={() => void sendMessage(prompt)}
+                          disabled={isStreaming || !isValidated}
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
             </main>
 
             <form className="chat-input" onSubmit={onSubmit}>
@@ -575,12 +605,12 @@ export default function App() {
                 rows={2}
               />
               <div className="composer-actions">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={onClearChat}
-                  disabled={isStreaming || messages.length === 0}
-                >
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={onClearChat}
+                    disabled={isStreaming || !hasMessages}
+                  >
                   Clear
                 </button>
                 <button type="submit" disabled={!canSend}>

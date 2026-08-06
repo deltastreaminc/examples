@@ -70,6 +70,7 @@ export async function streamChat(
 ): Promise<StreamResult> {
   let finalText = ''
   let streamedText = ''
+  let followUps: string[] = []
 
   // Apply a single {event, data} item. Returns the message of a terminal error
   // event (caller should stop and surface a PartialStreamError), or null.
@@ -111,6 +112,24 @@ export async function streamChat(
     } else if (event === 'final') {
       if (typeof data.text === 'string') {
         finalText = data.text
+      }
+    } else if (event === 'follow_ups') {
+      const questions = data.questions
+      if (Array.isArray(questions)) {
+        const seen = new Set<string>()
+        followUps = questions
+          .filter((question): question is string => typeof question === 'string')
+          .map((question) => question.trim())
+          .filter((question) => question.length > 0)
+          .filter((question) => {
+            const key = question.toLowerCase()
+            if (seen.has(key)) {
+              return false
+            }
+            seen.add(key)
+            return true
+          })
+          .slice(0, 3)
       }
     } else if (event === 'error') {
       return typeof data.message === 'string' ? data.message : 'Unknown streaming error'
@@ -178,5 +197,6 @@ export async function streamChat(
 
   return {
     text: finalText || streamedText,
+    followUps,
   }
 }
