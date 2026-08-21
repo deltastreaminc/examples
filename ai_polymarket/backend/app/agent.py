@@ -458,6 +458,11 @@ FOLLOW_UP_ALLOWED_PREFIXES = (
     "break down",
 )
 
+VAGUE_FOLLOW_UP_PATTERNS = (
+    r"^(?:what|which|where|who|how|is|are|do|does|did|can|could|would)\s+(?:this|that|it|they|them|these|those|here|there|now)\?$",
+    r"^(?:show|explain|compare|break down)\s+(?:this|that|it|them|these|those)\?$",
+)
+
 
 def messages_from_transcript(
     transcript: list[tuple[str, str]],
@@ -579,6 +584,10 @@ def _normalize_follow_up_question(text: str) -> str:
     if not cleaned.endswith("?"):
         cleaned = f"{cleaned.rstrip('.!')}?"
     if len(cleaned) > MAX_FOLLOW_UP_QUESTION_CHARS:
+        return ""
+    if len(re.findall(r"\b[\w'-]+\b", cleaned)) < 2:
+        return ""
+    if any(re.match(pattern, lowered) for pattern in VAGUE_FOLLOW_UP_PATTERNS):
         return ""
     blocked_prefixes = (
         "tell me more",

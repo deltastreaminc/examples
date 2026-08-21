@@ -72,6 +72,8 @@ export async function streamChat(
   let streamedText = ''
   let followUps: string[] = []
 
+  const isRenderableFollowUp = (question: string) => question.match(/\b[\w'-]+\b/g)?.length ?? 0 >= 2
+
   // Apply a single {event, data} item. Returns the message of a terminal error
   // event (caller should stop and surface a PartialStreamError), or null.
   const applyEvent = (event: string, data: Record<string, unknown>): string | null => {
@@ -121,6 +123,7 @@ export async function streamChat(
           .filter((question): question is string => typeof question === 'string')
           .map((question) => question.trim())
           .filter((question) => question.length > 0)
+          .filter((question) => isRenderableFollowUp(question))
           .filter((question) => {
             const key = question.toLowerCase()
             if (seen.has(key)) {

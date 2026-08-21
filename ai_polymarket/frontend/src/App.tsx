@@ -1,4 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 
 import { PartialStreamError, signup, streamChat, validateToken } from './api'
 import type { ChatMessage, LlmTimingEvent, SqlStatement } from './types'
@@ -348,6 +349,18 @@ export default function App() {
   const latestTiming = llmTimingEvents[llmTimingEvents.length - 1]
   const latestAssistantMessage = [...messages].reverse().find((message) => message.role === 'assistant')
 
+  const renderMessageBody = (message: ChatMessage) => {
+    if (message.role === 'assistant') {
+      return (
+        <div className="message-markdown">
+          <ReactMarkdown>{message.text}</ReactMarkdown>
+        </div>
+      )
+    }
+
+    return <pre>{message.text}</pre>
+  }
+
   return (
     <div className="page-shell">
       <header className="topbar">
@@ -562,7 +575,7 @@ export default function App() {
                   {message.role === 'assistant' && isStreaming && !message.text ? (
                     <div className="thinking-state">Reading live market context...</div>
                   ) : (
-                    <pre>{message.text}</pre>
+                    renderMessageBody(message)
                   )}
                 </article>
               ))}
