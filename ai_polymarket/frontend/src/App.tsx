@@ -77,6 +77,8 @@ export default function App() {
   const [isValidated, setIsValidated] = useState(false)
   const [isSignupCollapsed, setIsSignupCollapsed] = useState(false)
   const [isTokenCollapsed, setIsTokenCollapsed] = useState(false)
+  const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false)
+  const [isFooterDisclaimerOpen, setIsFooterDisclaimerOpen] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [isSigningUp, setIsSigningUp] = useState(false)
   const [isValidating, setIsValidating] = useState(false)
@@ -110,11 +112,7 @@ export default function App() {
   }, [token])
   const hasMessages = messages.length > 0
 
-  const onSignup = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!canSignup) {
-      return
-    }
+  const submitSignup = async () => {
     setError(null)
     setSignupMessage(null)
     setIsSigningUp(true)
@@ -122,11 +120,28 @@ export default function App() {
       const message = await signup(email.trim())
       setSignupMessage(message)
       setIsSignupCollapsed(true)
+      setIsDisclaimerOpen(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown signup error')
     } finally {
       setIsSigningUp(false)
     }
+  }
+
+  const onSignup = (event: FormEvent) => {
+    event.preventDefault()
+    if (!canSignup) {
+      return
+    }
+    setError(null)
+    setIsDisclaimerOpen(true)
+  }
+
+  const onConfirmDisclaimer = async () => {
+    if (!canSignup) {
+      return
+    }
+    await submitSignup()
   }
 
   const runTokenValidation = async (rawToken: string) => {
@@ -363,6 +378,37 @@ export default function App() {
 
   return (
     <div className="page-shell">
+      {isDisclaimerOpen ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => !isSigningUp && setIsDisclaimerOpen(false)}>
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="signup-disclaimer-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="card-kicker">/ notice /</div>
+            <h2 id="signup-disclaimer-title">Demo &amp; Educational Use Only</h2>
+            <p>
+              The Polymarket Intelligence Agent is a free experimental project from DeltaStream designed to
+              demonstrate how AI agents can use continuously updated data context.
+            </p>
+            <p>
+              It is provided for informational, educational, and demonstration purposes only. It does not provide
+              investment, financial, trading, betting, legal, or other professional advice, and nothing it produces
+              should be interpreted as a recommendation to buy, sell, trade, or participate in any market.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="modal-secondary" onClick={() => setIsDisclaimerOpen(false)} disabled={isSigningUp}>
+                Cancel
+              </button>
+              <button type="button" className="modal-primary" onClick={() => void onConfirmDisclaimer()} disabled={!canSignup}>
+                {isSigningUp ? 'Submitting...' : 'I understand, continue'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <header className="topbar">
         <a className="brand-mark" href="https://www.deltastream.io/" target="_blank" rel="noreferrer">
           <DeltaStreamLogo />
@@ -632,6 +678,70 @@ export default function App() {
               </div>
             </form>
           </section>
+        </section>
+
+        <section className="footer-disclaimer" aria-labelledby="important-disclaimer-title">
+          <button
+            type="button"
+            className="footer-disclaimer-toggle"
+            onClick={() => setIsFooterDisclaimerOpen((current) => !current)}
+            aria-expanded={isFooterDisclaimerOpen}
+            aria-controls="important-disclaimer-content"
+          >
+            <span>
+              <span className="card-kicker">/ legal /</span>
+              <strong id="important-disclaimer-title">Important Disclaimer</strong>
+            </span>
+            <span>{isFooterDisclaimerOpen ? 'Hide' : 'Show full disclaimer'}</span>
+          </button>
+          {isFooterDisclaimerOpen ? (
+            <div id="important-disclaimer-content" className="footer-disclaimer-content">
+              <p>
+                The Polymarket Intelligence Agent is an experimental technology demonstration provided by DeltaStream to
+                showcase the use of continuously maintained, real-time data context with AI agents.
+              </p>
+              <p>
+                The agent is provided solely for informational, educational, research, and demonstration purposes.
+                DeltaStream is not an investment adviser, broker, dealer, exchange, prediction-market operator, or
+                financial adviser. Nothing provided by the agent constitutes investment, financial, trading, betting,
+                legal, tax, or other professional advice, or a recommendation or solicitation to enter into any
+                transaction.
+              </p>
+              <p>
+                The agent analyzes data and derived signals such as market activity, acceleration, directional flow,
+                participant concentration, signal quality, and changes over time. These signals describe observed
+                activity only. They do not predict future outcomes, establish the probability of an event occurring, or
+                indicate that any position or trade will be profitable.
+              </p>
+              <p>
+                Data may be delayed, incomplete, inaccurate, unavailable, duplicated, subsequently corrected, or
+                interpreted incorrectly. AI-generated responses may also contain errors or omissions. You should
+                independently verify any information before relying on it.
+              </p>
+              <p>
+                References to &quot;newly observed wallets,&quot; unusual participation, concentrated activity, or similar
+                behavioral patterns refer only to patterns observed in the data available to the system. They do not
+                establish the identity, intent, knowledge, coordination, legality, or conduct of any individual or
+                entity. The agent does not determine whether activity constitutes insider trading, manipulation, fraud,
+                or other misconduct.
+              </p>
+              <p>
+                Prediction markets and event contracts involve risk and may be subject to legal or regulatory
+                restrictions depending on your location. You are solely responsible for determining whether your use of
+                any prediction-market platform or participation in any market is lawful and appropriate for you.
+              </p>
+              <p>
+                DeltaStream makes no representation or warranty regarding the accuracy, completeness, timeliness,
+                availability, reliability, or fitness for any particular purpose of the agent, its responses, or the
+                underlying data. Use of the agent and any decisions made based on its output are at your own risk.
+              </p>
+              <p>
+                DeltaStream is not affiliated with, endorsed by, or sponsored by Polymarket unless expressly stated
+                otherwise. References to Polymarket and other third-party products, services, trademarks, and data
+                sources are for identification and demonstration purposes only.
+              </p>
+            </div>
+          ) : null}
         </section>
 
         {error ? <div className="error">Error: {error}</div> : null}

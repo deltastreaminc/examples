@@ -73,6 +73,67 @@ pre {
   min-height: 100vh;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(10, 4, 42, 0.46);
+  backdrop-filter: blur(8px);
+}
+
+.modal-card {
+  width: min(680px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: clamp(20px, 3vw, 28px);
+  border: 1px solid var(--ink);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 243, 255, 0.96));
+  box-shadow: var(--shadow);
+}
+
+.modal-card h2 {
+  margin: 0;
+  font-family: 'DM Sans', Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+}
+
+.modal-card p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 6px;
+}
+
+.modal-actions button {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid var(--line-strong);
+  font-weight: 800;
+}
+
+.modal-secondary {
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+}
+
+.modal-primary {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: white;
+  box-shadow: 0 16px 32px rgba(12, 71, 220, 0.18);
+}
+
 .topbar {
   position: sticky;
   top: 0;
@@ -184,6 +245,58 @@ pre {
   margin: 0 auto 36px;
   display: grid;
   gap: 18px;
+}
+
+.footer-disclaimer {
+  display: grid;
+  gap: 14px;
+  padding: clamp(20px, 2.8vw, 30px);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(246, 249, 255, 0.92));
+  box-shadow: var(--shadow-soft);
+}
+
+.footer-disclaimer-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.footer-disclaimer-toggle span:first-child {
+  display: grid;
+  gap: 6px;
+}
+
+.footer-disclaimer-toggle strong {
+  font-family: 'DM Sans', Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.45rem, 2vw, 1.9rem);
+  letter-spacing: -0.05em;
+}
+
+.footer-disclaimer-toggle span:last-child {
+  color: var(--blue-dark);
+  font-size: 0.88rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.footer-disclaimer-content {
+  display: grid;
+  gap: 14px;
+}
+
+.footer-disclaimer-content p {
+  max-width: 980px;
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.62;
 }
 
 .hero-panel {
@@ -948,6 +1061,23 @@ pre {
   }
 
   .message {
+    width: 100%;
+  }
+
+  .footer-disclaimer-toggle {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .footer-disclaimer-toggle span:last-child {
+    white-space: normal;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .modal-actions button {
     width: 100%;
   }
 
