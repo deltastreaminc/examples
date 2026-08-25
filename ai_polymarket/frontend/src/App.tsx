@@ -4,15 +4,6 @@ import ReactMarkdown from 'react-markdown'
 import { PartialStreamError, signup, streamChat, validateToken } from './api'
 import type { ChatMessage, LlmTimingEvent, SqlStatement } from './types'
 
-declare global {
-  interface Window {
-    __BUILD_INFO__?: {
-      buildDate?: string
-      buildMarker?: string
-    }
-  }
-}
-
 function DeltaStreamLogo() {
   return (
     <svg
@@ -61,8 +52,6 @@ const formatDuration = (durationMs: number) => {
   }
   return `${Math.round(durationMs)}ms`
 }
-
-const buildInfo = globalThis.window?.__BUILD_INFO__
 
 export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -415,15 +404,8 @@ export default function App() {
         </a>
         <div className="product-mark" aria-label="Product name">
           <span>Polymarket</span>
-          <strong>Signal Radar</strong>
+          <strong>Intelligence Agent</strong>
         </div>
-        {buildInfo?.buildDate || buildInfo?.buildMarker ? (
-          <div className="build-badge" aria-label="Running image build info">
-            <span>Running build</span>
-            <strong>{buildInfo.buildMarker || 'unknown'}</strong>
-            {buildInfo.buildDate ? <em>{buildInfo.buildDate}</em> : null}
-          </div>
-        ) : null}
         <div className="topbar-status">
           <span className={isValidated ? 'status-dot online' : 'status-dot'} />
           {isValidated ? 'Demo access active' : 'Validate access to chat'}
@@ -444,7 +426,7 @@ export default function App() {
           <div className="hero-sidecar" aria-label="Demo data path">
             <div className="flow-step">Trades</div>
             <div className="flow-line" />
-            <div className="flow-step flow-step-strong">Signal radar</div>
+            <div className="flow-step flow-step-strong">Intelligence Agent</div>
             <div className="flow-line" />
             <div className="flow-step">Briefing</div>
           </div>
@@ -617,7 +599,7 @@ export default function App() {
 
               {messages.map((message) => (
                 <article key={message.id} className={`message ${message.role}`}>
-                  <div className="meta">{message.role === 'user' ? 'You' : 'Signal Radar'}</div>
+                  <div className="meta">{message.role === 'user' ? 'You' : 'Intelligence Agent'}</div>
                   {message.role === 'assistant' && isStreaming && !message.text ? (
                     <div className="thinking-state">Reading live market context...</div>
                   ) : (
@@ -678,6 +660,22 @@ export default function App() {
               </div>
             </form>
           </section>
+        </section>
+
+        <section className="footer-disclaimer footer-attribution" aria-labelledby="data-attribution-title">
+          <div className="card-kicker">/ data /</div>
+          <h2 id="data-attribution-title">Data &amp; Attribution</h2>
+          <div className="footer-disclaimer-content">
+            <p>
+              <strong>Data &amp; Attribution:</strong> The Polymarket Intelligence Agent is built by DeltaStream using
+              Polymarket market activity and metadata, including real-time onchain Polymarket data provided by
+              Goldsky. Polymarket and Goldsky are trademarks of their respective owners.
+            </p>
+            <p>
+              This experimental agent is built and operated by DeltaStream and is not affiliated with, sponsored by, or
+              endorsed by Polymarket.
+            </p>
+          </div>
         </section>
 
         <section className="footer-disclaimer" aria-labelledby="important-disclaimer-title">

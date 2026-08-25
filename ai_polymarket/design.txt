@@ -1,4 +1,4 @@
-Polymarket Live Signal Radar design
+Polymarket Intelligence Agent design
 
 Purpose
 - Explain live Polymarket activity using DeltaStream-precomputed context.

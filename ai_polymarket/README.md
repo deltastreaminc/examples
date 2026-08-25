@@ -1,4 +1,4 @@
-# Polymarket Live Signal Radar
+# Polymarket Intelligence Agent
 
 A standalone demo that uses **PydanticAI + Anthropic Sonnet 4.6** with a **DeltaStream MCP server** and a React chat UI with SSE streaming.
 

@@ -311,7 +311,7 @@ async def _run_chat_job(
 # ROOT_PATH so they are reachable at /<prefix>/api/* and /<prefix>/*.
 # ---------------------------------------------------------------------------
 
-_inner = FastAPI(title="Polymarket Live Signal Radar", version="0.1.0")
+_inner = FastAPI(title="Polymarket Intelligence Agent", version="0.1.0")
 
 
 @_inner.get("/api/health")
@@ -515,7 +515,7 @@ async def frontend_routes(full_path: str):
 # Outer app — mounts the inner app under ROOT_PATH (or at root when unset).
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="Polymarket Live Signal Radar", version="0.1.0")
+app = FastAPI(title="Polymarket Intelligence Agent", version="0.1.0")
 
 if _ROOT_PATH:
     app.mount(_ROOT_PATH, _inner)
