@@ -1,0 +1,90 @@
+# Reference Kubernetes manifest for the Polymarket Live Signal Radar demo.
+#
+# This captures every deployment requirement discovered for this app:
+#   - ROOT_PATH so the backend serves under the /polymarket Ingress prefix
+#   - MODEL_NAME to select the LLM provider (Gemini here)
+#   - AI_DEMO_BACKEND / DELTASTREAM_MCP_URL for the demo gateway + MCP
+#   - a single replica (chat jobs are held in-process and polled)
+#   - imagePullPolicy: Always so :latest is re-pulled on rollout
+#   - hostAliases so the pod can resolve the demo gateway hostnames
+#
+# Adjust namespace, image tag, and IPs to your environment before applying.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polymarket-live-signal-radar
+  labels:
+    app: polymarket-live-signal-radar
+spec:
+  # Keep a SINGLE replica: chat runs as an in-process background job that the
+  # frontend polls (POST /api/chat/start then GET /api/chat/poll/{id}). A second
+  # replica would not have the job and polls would 404. If you must scale, add
+  # sticky sessions on the route so polls reach the pod that started the job.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polymarket-live-signal-radar
+  template:
+    metadata:
+      labels:
+        app: polymarket-live-signal-radar
+    spec:
+      # ----------------------------------------------------------------------
+      # DNS workaround: the backend makes server-side calls to the demo gateway
+      # (Anthropic/Gemini proxy + signup) and to the DeltaStream MCP endpoint.
+      # If the cluster's DNS cannot resolve these public hostnames from inside a
+      # pod (symptom: "[Errno -3] Temporary failure in name resolution"), pin
+      # them here to the ingress ELB IPs.
+      #
+      # NOTE: these are AWS ELB IPs and CAN rotate over time. The robust fix is
+      # to make cluster DNS (CoreDNS) resolve external names, or to point
+      # AI_DEMO_BACKEND / DELTASTREAM_MCP_URL at in-cluster service addresses.
+      # Re-resolve with `dig +short <host>` if connectivity breaks later.
+      hostAliases:
+        - ip: "44.241.201.142"      # demo.deltastream.io (us-west-2 ingress)
+          hostnames:
+            - "demo.deltastream.io"
+      containers:
+        - name: app
+          image: public.ecr.aws/i3m5v2n6/deltastreaminc/polymarket-live-signal-radar-demo:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            # Served behind the /polymarket Ingress prefix (not stripped).
+            - name: ROOT_PATH
+              value: "/polymarket"
+            # LLM provider selected by prefix: google:/gemini: or anthropic:
+            - name: MODEL_NAME
+              value: "google:gemini-3.5-flash"
+            # Demo gateway base; all of /anthropic, /gemini, /api/signup derive from it.
+            - name: AI_DEMO_BACKEND
+              value: "https://demo.deltastream.io"
+            - name: DELTASTREAM_MCP_URL
+              value: "https://api-kd8j38.stage.deltastream-internal.name/mcp/v2"
+            # Optional tuning (see .env.example for the full list).
+            - name: GEMINI_THINKING_LEVEL
+              value: "low"
+          readinessProbe:
+            httpGet:
+              path: /polymarket/api/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /polymarket/api/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: polymarket-live-signal-radar
+spec:
+  selector:
+    app: polymarket-live-signal-radar
+  ports:
+    - port: 80
+      targetPort: 8000

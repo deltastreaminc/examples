@@ -1,2 +1,18 @@
 __pycache__/
 *.pyc
+.DS_Store
+
+# Local credentials and generated Lambda artifacts.
+polymarket/client.txt
+polymarket/opencode.json
+polymarket/gamma-sync/package/
+polymarket/gamma-sync/*.zip
+
+# Generated polymarket artifacts.
+polymarket/agent_demo/dist/
+polymarket/agent_demo/frontend/dist/
+polymarket/agent_demo/frontend/node_modules/
+polymarket/agent_demo/frontend/*.tsbuildinfo
+polymarket/agent_demo/frontend/vite.config.d.ts
+polymarket/agent_demo/frontend/vite.config.js
+polymarket/gamma-udf/target/
