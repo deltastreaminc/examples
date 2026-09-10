@@ -676,23 +676,19 @@ def handler(event, context):
                     # genuine state changes (closed, acceptingOrders, etc.).
                     #
                     # off: no dedup; publish every qualifying record.
+                    content_hash_value: str | None = None
                     if DEDUP_MODE == "first_seen":
                         if condition_id in _DEDUP_CACHE:
                             _DEDUP_CACHE[condition_id] = _now_monotonic()
                             skipped_total += 1
                             pass_summaries[current_pass]["skipped"] += 1
                             continue
-                        _DEDUP_CACHE[condition_id] = _now_monotonic()
                     elif DEDUP_MODE == "content_hash":
-                        h = _content_hash(market)
-                        if _HASH_CACHE.get(condition_id) == h:
+                        content_hash_value = _content_hash(market)
+                        if _HASH_CACHE.get(condition_id) == content_hash_value:
                             skipped_total += 1
                             pass_summaries[current_pass]["skipped"] += 1
                             continue
-                        _HASH_CACHE[condition_id] = h
-                        # Track last-seen time so the TTL pruner can evict
-                        # inactive markets from both caches.
-                        _DEDUP_CACHE[condition_id] = _now_monotonic()
 
                     # Fire-and-forget: hand the record to the producer's
                     # background sender and keep paging. We do NOT block on the
@@ -702,7 +698,20 @@ def handler(event, context):
                     # (linger + batch.size) across pages; errors are captured via
                     # the errback and durability is guaranteed by the periodic /
                     # pre-checkpoint flushes below.
+                    #
+                    # Only mark the record as "seen"/"published" in the dedup
+                    # caches once send() has been accepted by the producer
+                    # (i.e. it did not raise synchronously). If send() raises,
+                    # the caches are left untouched so a retry can still
+                    # publish this record instead of silently skipping it.
                     producer.send(KAFKA_TOPIC, key=condition_id, value=market).add_errback(_on_send_error)
+                    if DEDUP_MODE == "first_seen":
+                        _DEDUP_CACHE[condition_id] = _now_monotonic()
+                    elif DEDUP_MODE == "content_hash":
+                        _HASH_CACHE[condition_id] = content_hash_value
+                        # Track last-seen time so the TTL pruner can evict
+                        # inactive markets from both caches.
+                        _DEDUP_CACHE[condition_id] = _now_monotonic()
                     published_total += 1
                     pass_summaries[current_pass]["published"] += 1
 

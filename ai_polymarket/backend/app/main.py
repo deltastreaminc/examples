@@ -498,8 +498,9 @@ async def frontend_routes(full_path: str):
     if full_path.startswith("api/"):
         return JSONResponse({"detail": "Not Found"}, status_code=404)
 
-    requested_file = FRONTEND_DIST_DIR / full_path
-    if requested_file.is_file():
+    frontend_root = FRONTEND_DIST_DIR.resolve()
+    requested_file = (frontend_root / full_path).resolve()
+    if requested_file.is_relative_to(frontend_root) and requested_file.is_file():
         return FileResponse(requested_file)
 
     # Return 404 for missing static assets rather than the SPA shell —
