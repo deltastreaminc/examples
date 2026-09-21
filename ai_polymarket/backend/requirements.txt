@@ -1,0 +1,8 @@
+fastapi>=0.115.12
+uvicorn[standard]>=0.34.2
+pydantic>=2.11.5
+pydantic-settings>=2.9.1
+pydantic-ai>=0.2.16
+google-genai>=2.10.0
+mcp>=1.9.3
+httpx>=0.28.1
